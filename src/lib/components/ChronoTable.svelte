@@ -5,6 +5,7 @@
   import { createVirtualizer } from '$lib/virtualizer/create-virtualizer.svelte';
   import TableHeader from './TableHeader.svelte';
   import TableRow from './TableRow.svelte';
+  import CellPopup from './CellPopup.svelte';
 
   let { data }: { data: ChronoData } = $props();
 
@@ -38,6 +39,16 @@
   function collapseAll() {
     treeState.collapseAll();
   }
+
+  let popupText = $state<string | null>(null);
+  let popupX = $state(0);
+  let popupY = $state(0);
+
+  function handlePopup(text: string | null, x: number, y: number) {
+    popupText = text;
+    popupX = x;
+    popupY = y;
+  }
 </script>
 
 <div class="chrono-wrapper">
@@ -70,13 +81,17 @@
               style:min-width="100%"
               style:height="{virtualRow.size}px"
             >
-              <TableRow {row} ontoggle={handleToggle} />
+              <TableRow {row} ontoggle={handleToggle} onpopup={handlePopup} />
             </div>
           {/if}
         {/each}
       </div>
     {/if}
   </div>
+
+  {#if popupText}
+    <CellPopup text={popupText} x={popupX} y={popupY} />
+  {/if}
 </div>
 
 <style>

@@ -1,10 +1,18 @@
 <script lang="ts">
   import type { TimelineEntry } from '$lib/types';
 
-  let { entry }: { entry: TimelineEntry } = $props();
+  let {
+    entry,
+    onpopup
+  }: {
+    entry: TimelineEntry;
+    onpopup: (text: string | null, x: number, y: number) => void;
+  } = $props();
+
+  let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const statusColor = $derived(() => {
-    if (!entry.status || entry.value === null) return 'transparent';
+    if (!entry.status || !entry.text) return 'transparent';
     switch (entry.status) {
       case 'completed': return 'var(--gap-positive)';
       case 'active': return 'var(--accent)';
@@ -13,14 +21,29 @@
       default: return 'transparent';
     }
   });
+
+  function onMouseEnter(e: MouseEvent) {
+    if (!entry.text) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    hoverTimeout = setTimeout(() => {
+      onpopup(entry.text, rect.left, rect.bottom + 4);
+    }, 300);
+  }
+
+  function onMouseLeave() {
+    clearTimeout(hoverTimeout);
+    onpopup(null, 0, 0);
+  }
 </script>
 
-<div class="timeline-cell">
-  {#if entry.value !== null}
+<div
+  class="timeline-cell"
+  onmouseenter={onMouseEnter}
+  onmouseleave={onMouseLeave}
+>
+  {#if entry.text}
     <div class="status-dot" style:background={statusColor()}></div>
-    <span class="value">{entry.value}</span>
-  {:else}
-    <span class="empty">—</span>
+    <span class="text">{entry.text}</span>
   {/if}
 </div>
 
@@ -28,15 +51,16 @@
   .timeline-cell {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
+    gap: 4px;
     min-width: var(--col-timeline-w);
     max-width: var(--col-timeline-w);
     height: var(--row-height);
-    font-variant-numeric: tabular-nums;
+    padding: 0 6px;
     font-size: 11px;
     color: var(--text-secondary);
     box-sizing: border-box;
+    overflow: hidden;
+    cursor: default;
   }
   .status-dot {
     width: 5px;
@@ -44,12 +68,10 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .empty {
-    color: var(--text-muted);
-    opacity: 0.3;
-  }
-  .value {
-    min-width: 20px;
-    text-align: right;
+  .text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 </style>

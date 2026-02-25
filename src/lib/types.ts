@@ -4,7 +4,7 @@ export type TimelineStatus = 'planned' | 'active' | 'completed' | 'at-risk';
 
 export interface TimelineEntry {
   year: number;
-  value: number | null;
+  text: string;
   status?: TimelineStatus;
 }
 

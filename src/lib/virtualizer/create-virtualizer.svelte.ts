@@ -1,4 +1,10 @@
-import { Virtualizer, type VirtualizerOptions } from '@tanstack/virtual-core';
+import {
+  Virtualizer,
+  elementScroll,
+  observeElementOffset,
+  observeElementRect,
+  type VirtualizerOptions
+} from '@tanstack/virtual-core';
 
 export function createVirtualizer<
   TScrollElement extends Element,
@@ -9,12 +15,14 @@ export function createVirtualizer<
   $effect(() => {
     const opts = optionsFn();
     const v = new Virtualizer<TScrollElement, TItemElement>({
+      observeElementRect,
+      observeElementOffset,
+      scrollToFn: elementScroll,
       ...opts,
       onChange: (updatedInstance, sync) => {
         if (sync) {
           instance = updatedInstance;
         } else {
-          // Use microtask to batch updates
           queueMicrotask(() => {
             instance = updatedInstance;
           });
@@ -27,7 +35,7 @@ export function createVirtualizer<
     instance = v;
 
     return () => {
-      // cleanup
+      v._willUpdate();
     };
   });
 

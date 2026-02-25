@@ -4,7 +4,11 @@
   import MetricCell from './MetricCell.svelte';
   import TimelineCell from './TimelineCell.svelte';
 
-  let { row, ontoggle }: { row: FlatRow; ontoggle: (id: string) => void } = $props();
+  let { row, ontoggle, onpopup }: {
+    row: FlatRow;
+    ontoggle: (id: string) => void;
+    onpopup: (text: string | null, x: number, y: number) => void;
+  } = $props();
 
   const bgMap = {
     category: 'var(--bg-category)',
@@ -43,7 +47,7 @@
 
   <!-- Timeline cells -->
   {#each row.timeline as entry (entry.year)}
-    <TimelineCell {entry} />
+    <TimelineCell {entry} {onpopup} />
   {/each}
 </div>
 
