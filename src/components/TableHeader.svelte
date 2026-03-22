@@ -9,16 +9,20 @@
     hierarchyWidth,
     metricWidths,
     metricFrozen,
+    focusYear,
     onhierarchyresize,
     onresize,
     ontogglefreeze,
+    onfocusyear,
   }: {
     hierarchyWidth: number;
     metricWidths: number[];
     metricFrozen: boolean[];
+    focusYear: number | null;
     onhierarchyresize: (width: number) => void;
     onresize: (index: number, width: number) => void;
     ontogglefreeze: (index: number) => void;
+    onfocusyear: (year: number | null) => void;
   } = $props();
 
   // Compute sticky left offsets — only for frozen columns, and only if all preceding columns are also frozen
@@ -122,7 +126,11 @@
   {/each}
 
   {#each years as year}
-    <div class="header-cell timeline-header">{year}</div>
+    <div
+      class="header-cell timeline-header"
+      class:year-focused={focusYear === year}
+      ondblclick={() => onfocusyear(focusYear === year ? null : year)}
+    >{year}</div>
   {/each}
 </div>
 
@@ -178,6 +186,15 @@
     max-width: var(--chronostra-col-timeline-w);
     justify-content: center;
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .timeline-header:hover {
+    color: var(--text-normal);
+  }
+  .timeline-header.year-focused {
+    color: var(--text-normal);
+    font-weight: 700;
+    border-bottom: 2px solid var(--text-normal);
   }
   .resize-handle {
     position: absolute;

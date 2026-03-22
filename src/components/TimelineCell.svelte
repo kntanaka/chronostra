@@ -3,12 +3,18 @@
 
   let {
     entry,
-    onpopup
+    onpopup,
+    focused,
+    onchange
   }: {
     entry: TimelineEntry;
     onpopup: (text: string | null, x: number, y: number) => void;
+    focused?: boolean;
+    onchange?: (year: number, text: string) => void;
   } = $props();
 
+  let editing = $state(false);
+  let editValue = $state('');
   let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const statusColor = $derived(() => {
@@ -23,7 +29,7 @@
   });
 
   function onMouseEnter(e: MouseEvent) {
-    if (!entry.text) return;
+    if (!entry.text || editing) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     hoverTimeout = setTimeout(() => {
       onpopup(entry.text, rect.left, rect.bottom + 4);
@@ -34,18 +40,58 @@
     clearTimeout(hoverTimeout);
     onpopup(null, 0, 0);
   }
+
+  function startEdit() {
+    if (!onchange) return;
+    clearTimeout(hoverTimeout);
+    onpopup(null, 0, 0);
+    editing = true;
+    editValue = entry.text;
+  }
+
+  function commitEdit() {
+    if (editing && editValue !== entry.text) {
+      onchange?.(entry.year, editValue);
+    }
+    editing = false;
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
+    if (e.key === 'Enter') {
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      editing = false;
+    }
+  }
 </script>
 
-<div
-  class="timeline-cell"
-  onmouseenter={onMouseEnter}
-  onmouseleave={onMouseLeave}
->
-  {#if entry.text}
-    <div class="status-dot" style:background={statusColor()}></div>
-    <span class="text">{entry.text}</span>
-  {/if}
-</div>
+{#if editing}
+  <div class="timeline-cell editing">
+    <input
+      class="timeline-input"
+      type="text"
+      bind:value={editValue}
+      onblur={commitEdit}
+      onkeydown={handleKeydown}
+      autofocus
+    />
+  </div>
+{:else}
+  <div
+    class="timeline-cell"
+    class:editable={!!onchange}
+    class:focused={focused}
+    onmouseenter={onMouseEnter}
+    onmouseleave={onMouseLeave}
+    ondblclick={startEdit}
+  >
+    {#if entry.text}
+      <div class="status-dot" style:background={statusColor()}></div>
+      <span class="text">{entry.text}</span>
+    {/if}
+  </div>
+{/if}
 
 <style>
   .timeline-cell {
@@ -57,10 +103,29 @@
     height: var(--chronostra-row-height);
     padding: 0 6px;
     font-size: 11px;
-    color: var(--text-faint);
+    color: var(--text-muted);
     box-sizing: border-box;
     overflow: hidden;
     cursor: default;
+  }
+  .timeline-cell.editable {
+    cursor: text;
+  }
+  .timeline-cell.editable:hover {
+    background: var(--background-secondary) !important;
+  }
+  .timeline-cell.focused {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-normal);
+  }
+  .timeline-cell.editing {
+    display: flex;
+    align-items: center;
+    min-width: var(--chronostra-col-timeline-w);
+    max-width: var(--chronostra-col-timeline-w);
+    height: var(--chronostra-row-height);
+    padding: 0 2px;
+    box-sizing: border-box;
   }
   .status-dot {
     width: 4px;
@@ -73,5 +138,17 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+  }
+  .timeline-input {
+    width: 100%;
+    height: calc(var(--chronostra-row-height) - 8px);
+    font-size: 11px;
+    font-family: inherit;
+    color: var(--text-normal);
+    background: var(--background-primary);
+    border: 1px solid var(--interactive-accent);
+    border-radius: 3px;
+    padding: 0 4px;
+    outline: none;
   }
 </style>

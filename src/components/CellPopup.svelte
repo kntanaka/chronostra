@@ -12,8 +12,8 @@
 
 <style>
   .cell-popup {
-    position: fixed;
-    z-index: 100;
+    position: absolute;
+    z-index: 200;
     max-width: 320px;
     padding: 8px 12px;
     background: var(--background-secondary);

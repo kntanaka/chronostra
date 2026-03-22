@@ -35,6 +35,7 @@
 
   let flatRows = $derived(flattenTree(data.categories, treeState));
 
+  let wrapperEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
 
   const virt = createVirtualizer<HTMLDivElement>(() => ({
@@ -75,6 +76,7 @@
     metricFrozen[index] = !metricFrozen[index];
   }
 
+  let focusYear = $state<number | null>(null);
   let scrollLeft = $state(0);
 
   function handleScroll() {
@@ -89,8 +91,14 @@
 
   function handlePopup(text: string | null, x: number, y: number) {
     popupText = text;
-    popupX = x;
-    popupY = y;
+    if (wrapperEl && text) {
+      const wrapperRect = wrapperEl.getBoundingClientRect();
+      popupX = x - wrapperRect.left;
+      popupY = y - wrapperRect.top;
+    } else {
+      popupX = x;
+      popupY = y;
+    }
   }
 
   // --- Data mutation helpers ---
@@ -117,15 +125,37 @@
     return null;
   }
 
+  let saveIndicator = $state(false);
+  let pendingEditId = $state<string | null>(null);
+
   function emitChange() {
     data = { ...data };
     onDataChange?.(data);
+    saveIndicator = true;
+    setTimeout(() => { saveIndicator = false; }, 800);
   }
 
   function handleMetricChange(id: string, type: 'future' | 'now' | 'gap', value: string) {
     const node = findNode(data.categories, id);
     if (node) {
       node.metrics[type] = value;
+      emitChange();
+    }
+  }
+
+  function handleTimelineChange(id: string, year: number, text: string) {
+    const node = findNode(data.categories, id);
+    if (node) {
+      const existing = node.timeline.find(e => e.year === year);
+      if (existing) {
+        if (text) {
+          existing.text = text;
+        } else {
+          node.timeline = node.timeline.filter(e => e.year !== year);
+        }
+      } else if (text) {
+        node.timeline.push({ year, text });
+      }
       emitChange();
     }
   }
@@ -148,8 +178,9 @@
     if (!node.children) node.children = [];
     const LEVEL_MAP = ['category', 'goal', 'project', 'task'] as const;
     const childLevel = LEVEL_MAP[Math.min(node.depth + 1, LEVEL_MAP.length - 1)];
+    const newId = generateId();
     node.children.push({
-      id: generateId(),
+      id: newId,
       label: 'New Item',
       level: childLevel,
       depth: node.depth + 1,
@@ -158,14 +189,16 @@
     });
     treeState.expanded.add(parentId);
     emitChange();
+    pendingEditId = newId;
   }
 
   function addSibling(id: string) {
     const loc = findParentAndIndex(data.categories, id);
     if (!loc) return;
     const sibling = loc.parent[loc.index];
+    const newId = generateId();
     loc.parent.splice(loc.index + 1, 0, {
-      id: generateId(),
+      id: newId,
       label: 'New Item',
       level: sibling.level,
       depth: sibling.depth,
@@ -173,6 +206,7 @@
       timeline: [],
     });
     emitChange();
+    pendingEditId = newId;
   }
 
   function deleteRow(id: string) {
@@ -180,6 +214,111 @@
     if (!loc) return;
     loc.parent.splice(loc.index, 1);
     emitChange();
+  }
+
+  // --- Drag and drop ---
+  let dragState = $state<{
+    draggedId: string;
+    targetId: string | null;
+    position: 'before' | 'after';
+  } | null>(null);
+
+  function handleDragStart(e: PointerEvent, rowId: string) {
+    dragState = { draggedId: rowId, targetId: null, position: 'after' };
+  }
+
+  function handleDragMove(e: PointerEvent) {
+    if (!dragState || !scrollContainer) return;
+    const scrollRect = scrollContainer.getBoundingClientRect();
+    const y = e.clientY - scrollRect.top + scrollContainer.scrollTop;
+
+    // Find which row the pointer is over using virtualizer
+    if (!virt.instance) return;
+    const items = virt.instance.getVirtualItems();
+    let targetRow: typeof flatRows[number] | null = null;
+    let pos: 'before' | 'after' = 'after';
+
+    for (const item of items) {
+      if (y >= item.start && y < item.start + item.size) {
+        targetRow = flatRows[item.index];
+        const mid = item.start + item.size / 2;
+        pos = y < mid ? 'before' : 'after';
+        break;
+      }
+    }
+
+    // If below all items, target the last row
+    if (!targetRow && items.length > 0) {
+      const last = items[items.length - 1];
+      if (y >= last.start + last.size) {
+        targetRow = flatRows[last.index];
+        pos = 'after';
+      }
+    }
+
+    if (targetRow && targetRow.id !== dragState.draggedId) {
+      // Don't allow dropping onto own descendants
+      if (!isDescendant(dragState.draggedId, targetRow.id)) {
+        dragState = { ...dragState, targetId: targetRow.id, position: pos };
+      }
+    }
+  }
+
+  function handleDragEnd() {
+    if (!dragState || !dragState.targetId) {
+      dragState = null;
+      return;
+    }
+
+    const { draggedId, targetId, position } = dragState;
+    dragState = null;
+
+    if (draggedId === targetId) return;
+
+    // Remove dragged node from tree
+    const srcLoc = findParentAndIndex(data.categories, draggedId);
+    if (!srcLoc) return;
+    const [draggedNode] = srcLoc.parent.splice(srcLoc.index, 1);
+
+    // Find target location (after removal, indices may have shifted)
+    const dstLoc = findParentAndIndex(data.categories, targetId);
+    if (!dstLoc) {
+      // Target vanished — put dragged node back
+      srcLoc.parent.splice(srcLoc.index, 0, draggedNode);
+      return;
+    }
+
+    const insertIndex = position === 'before' ? dstLoc.index : dstLoc.index + 1;
+    const targetNode = dstLoc.parent[dstLoc.index] ?? dstLoc.parent[dstLoc.parent.length - 1];
+
+    // Update depth/level to match new siblings
+    const depthDelta = (targetNode?.depth ?? 0) - draggedNode.depth;
+    updateDepth(draggedNode, depthDelta);
+
+    dstLoc.parent.splice(insertIndex, 0, draggedNode);
+    emitChange();
+  }
+
+  function isDescendant(ancestorId: string, nodeId: string): boolean {
+    const ancestor = findNode(data.categories, ancestorId);
+    if (!ancestor || !ancestor.children) return false;
+    for (const child of ancestor.children) {
+      if (child.id === nodeId) return true;
+      if (child.children && isDescendant(child.id, nodeId)) return true;
+    }
+    return false;
+  }
+
+  const LEVEL_ORDER: ('category' | 'goal' | 'project' | 'task')[] = ['category', 'goal', 'project', 'task'];
+
+  function updateDepth(node: TreeNode, delta: number) {
+    node.depth += delta;
+    node.level = LEVEL_ORDER[Math.min(Math.max(node.depth, 0), LEVEL_ORDER.length - 1)];
+    if (node.children) {
+      for (const child of node.children) {
+        updateDepth(child, delta);
+      }
+    }
   }
 
   // --- Row context menu ---
@@ -202,27 +341,26 @@
   }
 </script>
 
-<svelte:window onclick={closeRowMenu} />
+<svelte:window
+  onclick={closeRowMenu}
+  onpointermove={dragState ? handleDragMove : undefined}
+  onpointerup={dragState ? handleDragEnd : undefined}
+/>
 
-<div class="chrono-wrapper">
+<div class="chrono-wrapper" class:is-dragging={!!dragState} bind:this={wrapperEl}>
   <div class="toolbar">
     <span class="title">Chronostra</span>
     <span class="row-count">{flatRows.length} rows</span>
-    <div class="toolbar-actions">
-      <button class="icon-btn" onclick={expandAll} title="Expand All">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M3 5.5L7 9.5L11 5.5" />
-        </svg>
-      </button>
-      <button class="icon-btn" onclick={collapseAll} title="Collapse All">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M3 9.5L7 5.5L11 9.5" />
-        </svg>
-      </button>
-    </div>
+    {#if saveIndicator}
+      <span class="save-indicator">saved</span>
+    {/if}
+    <button class="tool-link" onclick={expandAll}>expand</button>
+    <span class="tool-sep">/</span>
+    <button class="tool-link" onclick={collapseAll}>collapse</button>
     <button class="add-btn" onclick={() => {
+      const newId = generateId();
       data.categories.push({
-        id: generateId(),
+        id: newId,
         label: 'New Category',
         level: 'category',
         depth: 0,
@@ -230,11 +368,12 @@
         timeline: [],
       });
       emitChange();
+      pendingEditId = newId;
     }}>+ Add Category</button>
   </div>
 
   <div class="scroll-container" bind:this={scrollContainer} onscroll={handleScroll}>
-    <TableHeader {hierarchyWidth} {metricWidths} {metricFrozen} onhierarchyresize={handleHierarchyResize} onresize={handleMetricResize} ontogglefreeze={handleToggleFreeze} />
+    <TableHeader {hierarchyWidth} {metricWidths} {metricFrozen} {focusYear} onhierarchyresize={handleHierarchyResize} onresize={handleMetricResize} ontogglefreeze={handleToggleFreeze} onfocusyear={(y) => { focusYear = y; }} />
 
     {#if virt.instance}
       <div
@@ -261,11 +400,19 @@
                 {metricWidths}
                 {metricFrozen}
                 {scrollLeft}
+                {focusYear}
+                autoEdit={pendingEditId === row.id}
+                isDragged={dragState?.draggedId === row.id}
+                isDropTarget={dragState?.targetId === row.id}
+                dropPosition={dragState?.targetId === row.id ? dragState.position : undefined}
                 ontoggle={handleToggle}
                 onpopup={handlePopup}
                 onmetricchange={handleMetricChange}
                 onlabelchange={handleLabelChange}
+                ontimelinechange={handleTimelineChange}
                 onrowcontextmenu={handleRowContextMenu}
+                onautoedited={() => { pendingEditId = null; }}
+                ondragstart={handleDragStart}
               />
             </div>
           {/if}
@@ -305,6 +452,10 @@
     background: var(--background-primary);
     overflow: hidden;
   }
+  .chrono-wrapper.is-dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
   .toolbar {
     display: flex;
     align-items: center;
@@ -325,26 +476,36 @@
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
   }
-  .toolbar-actions {
-    display: flex;
-    gap: 2px;
-  }
-  .icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    background: transparent;
-    border: 1px solid transparent;
+  .save-indicator {
+    font-size: 9px;
     color: var(--text-faint);
-    cursor: pointer;
-    padding: 0;
-    transition: color 0.1s, border-color 0.1s;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    animation: fade-in-out 0.8s ease forwards;
   }
-  .icon-btn:hover {
+  @keyframes fade-in-out {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .tool-link {
+    font-size: 10px;
+    color: var(--text-faint);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .tool-link:hover {
     color: var(--text-normal);
-    border-color: var(--background-modifier-border);
+  }
+  .tool-sep {
+    font-size: 10px;
+    color: var(--text-faint);
+    opacity: 0.4;
   }
   .add-btn {
     margin-left: auto;

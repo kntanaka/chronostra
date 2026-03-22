@@ -2,15 +2,27 @@
   import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
-  let { row, width, ontoggle, onlabelchange }: {
+  let { row, width, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart }: {
     row: FlatRow;
     width: number;
+    autoEdit?: boolean;
+    isDragging?: boolean;
     ontoggle: (id: string) => void;
     onlabelchange?: (id: string, newLabel: string) => void;
+    onautoedited?: () => void;
+    ondragstart?: (e: PointerEvent) => void;
   } = $props();
 
   let editing = $state(false);
   let editValue = $state('');
+
+  $effect(() => {
+    if (autoEdit && onlabelchange && !editing) {
+      editing = true;
+      editValue = row.label;
+      onautoedited?.();
+    }
+  });
 
   const levelLabels = {
     category: 'CAT',
@@ -33,6 +45,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
     if (e.key === 'Enter') {
       commitEdit();
     } else if (e.key === 'Escape') {
@@ -42,6 +55,19 @@
 </script>
 
 <div class="hierarchy-cell" style:padding-left="{row.depth * 20 + 8}px" style:min-width="{width}px" style:max-width="{width}px">
+  {#if ondragstart}
+    <span
+      class="drag-handle"
+      class:dragging={isDragging}
+      onpointerdown={(e) => { e.preventDefault(); ondragstart(e); }}
+    >
+      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+        <circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/>
+        <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+        <circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/>
+      </svg>
+    </span>
+  {/if}
   {#each Array(row.depth) as _, i}
     <div
       class="indent-guide"
@@ -86,6 +112,28 @@
     white-space: nowrap;
     box-sizing: border-box;
     background: inherit;
+    position: relative;
+  }
+  .drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    flex-shrink: 0;
+    cursor: grab;
+    color: transparent;
+    transition: color 0.1s;
+    margin-left: -2px;
+  }
+  .hierarchy-cell:hover .drag-handle {
+    color: var(--text-faint);
+  }
+  .drag-handle:hover {
+    color: var(--text-muted) !important;
+  }
+  .drag-handle.dragging {
+    color: var(--text-normal) !important;
+    cursor: grabbing;
   }
   .indent-guide {
     position: absolute;

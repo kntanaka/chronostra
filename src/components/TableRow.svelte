@@ -4,17 +4,25 @@
   import MetricCell from './MetricCell.svelte';
   import TimelineCell from './TimelineCell.svelte';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, scrollLeft, ontoggle, onpopup, onmetricchange, onlabelchange, onrowcontextmenu }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, scrollLeft, focusYear, autoEdit, isDragged, isDropTarget, dropPosition, ontoggle, onpopup, onmetricchange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
     metricFrozen: boolean[];
     scrollLeft: number;
+    focusYear?: number | null;
+    autoEdit?: boolean;
+    isDragged?: boolean;
+    isDropTarget?: boolean;
+    dropPosition?: 'before' | 'after';
     ontoggle: (id: string) => void;
     onpopup: (text: string | null, x: number, y: number) => void;
     onmetricchange?: (id: string, type: 'future' | 'now' | 'gap', value: string) => void;
     onlabelchange?: (id: string, newLabel: string) => void;
+    ontimelinechange?: (id: string, year: number, text: string) => void;
     onrowcontextmenu?: (e: MouseEvent, rowId: string) => void;
+    onautoedited?: () => void;
+    ondragstart?: (e: PointerEvent, rowId: string) => void;
   } = $props();
 
   const bgMap = {
@@ -56,6 +64,9 @@
 
 <div
   class="table-row"
+  class:dragged={isDragged}
+  class:drop-before={isDropTarget && dropPosition === 'before'}
+  class:drop-after={isDropTarget && dropPosition === 'after'}
   style:background={bgMap[row.level]}
   style:font-weight={fontWeightMap[row.level]}
   oncontextmenu={handleContextMenu}
@@ -67,7 +78,7 @@
     style:max-width="{hierarchyWidth}px"
     style:background={bgMap[row.level]}
   >
-    <HierarchyCell {row} width={hierarchyWidth} {ontoggle} {onlabelchange} />
+    <HierarchyCell {row} width={hierarchyWidth} {autoEdit} isDragging={isDragged} {ontoggle} {onlabelchange} {onautoedited} ondragstart={ondragstart ? (e) => ondragstart(e, row.id) : undefined} />
   </div>
 
   {#each metricTypes as type, i}
@@ -91,7 +102,7 @@
 
   {#each years as year (year)}
     {@const entry = timelineByYear.get(year) ?? { year, text: '' }}
-    <TimelineCell {entry} {onpopup} />
+    <TimelineCell {entry} {onpopup} focused={focusYear === year} onchange={ontimelinechange ? (year, text) => ontimelinechange(row.id, year, text) : undefined} />
   {/each}
 </div>
 
@@ -101,19 +112,40 @@
     width: max-content;
     min-width: 100%;
     border-bottom: 1px solid var(--background-modifier-border);
+    transition: background 0.08s ease;
   }
   .table-row:hover {
     background: var(--background-secondary) !important;
   }
+  .table-row:hover :global(.hierarchy-cell),
+  .table-row:hover :global(.metric-cell),
+  .table-row:hover :global(.timeline-cell) {
+    background: inherit !important;
+  }
   .hierarchy-wrap {
     z-index: 2;
     flex-shrink: 0;
+    transition: background 0.08s ease;
+  }
+  .table-row:hover .hierarchy-wrap,
+  .table-row:hover .metric-col.frozen {
+    background: var(--background-secondary) !important;
   }
   .metric-col {
     z-index: 0;
     flex-shrink: 0;
+    transition: background 0.08s ease;
   }
   .frozen {
     z-index: 2;
+  }
+  .table-row.dragged {
+    opacity: 0.3;
+  }
+  .table-row.drop-before {
+    box-shadow: 0 -2px 0 0 var(--text-normal) inset;
+  }
+  .table-row.drop-after {
+    box-shadow: 0 2px 0 0 var(--text-normal) inset;
   }
 </style>

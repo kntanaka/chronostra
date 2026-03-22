@@ -31,6 +31,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
     if (e.key === 'Enter') {
       commitEdit();
     } else if (e.key === 'Escape') {
