@@ -40,6 +40,22 @@
     treeState.collapseAll();
   }
 
+  let hierarchyWidth = $state(320);
+  let metricWidths = $state([200, 200, 200]);
+  let metricFrozen = $state([true, true, true]);
+
+  function handleHierarchyResize(width: number) {
+    hierarchyWidth = Math.max(150, width);
+  }
+
+  function handleMetricResize(index: number, width: number) {
+    metricWidths[index] = Math.max(80, width);
+  }
+
+  function handleToggleFreeze(index: number) {
+    metricFrozen[index] = !metricFrozen[index];
+  }
+
   let popupText = $state<string | null>(null);
   let popupX = $state(0);
   let popupY = $state(0);
@@ -60,7 +76,7 @@
   </div>
 
   <div class="scroll-container" bind:this={scrollContainer}>
-    <TableHeader />
+    <TableHeader {hierarchyWidth} {metricWidths} {metricFrozen} onhierarchyresize={handleHierarchyResize} onresize={handleMetricResize} ontogglefreeze={handleToggleFreeze} />
 
     {#if virt.instance}
       <div
@@ -81,7 +97,7 @@
               style:min-width="100%"
               style:height="{virtualRow.size}px"
             >
-              <TableRow {row} ontoggle={handleToggle} onpopup={handlePopup} />
+              <TableRow {row} {hierarchyWidth} {metricWidths} {metricFrozen} ontoggle={handleToggle} onpopup={handlePopup} />
             </div>
           {/if}
         {/each}

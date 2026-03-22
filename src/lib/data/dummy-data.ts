@@ -119,6 +119,106 @@ const TASK_TEMPLATES = [
   'Plan quarterly review'
 ];
 
+const METRIC_TEXTS: Record<string, { future: string[]; now: string[]; gap: string[] }> = {
+  category: {
+    future: [
+      '各分野で自律的に成長し続ける状態',
+      '持続可能な生活基盤が完成している',
+      '長期ビジョンが明確で実行中',
+      '全ゴールが計画通り進行している',
+      '理想のライフバランスを実現',
+    ],
+    now: [
+      '方向性は定まったが実行が不十分',
+      '一部のゴールのみ着手済み',
+      '基盤づくりの初期段階',
+      '計画は立てたが進捗にばらつき',
+      '優先順位の整理が必要な段階',
+    ],
+    gap: [
+      '実行力と習慣化が不足',
+      '時間配分の最適化が必要',
+      'リソースの集中投下が課題',
+      '横断的な連携が取れていない',
+      '定期的な振り返りの仕組みがない',
+    ],
+  },
+  goal: {
+    future: [
+      '明確なKPIを達成し維持している',
+      '習慣として定着し自動化されている',
+      '専門的なスキルが身についている',
+      '成果が目に見える形で現れている',
+      '他者にも教えられるレベル',
+    ],
+    now: [
+      '目標は設定済みだが未着手が多い',
+      '断続的に取り組んでいる状態',
+      '基礎的な知識は習得済み',
+      '試行錯誤の段階にある',
+      '週1回程度の取り組み頻度',
+    ],
+    gap: [
+      '継続的な実践の仕組みが必要',
+      'スキルの深掘りが不足している',
+      '具体的な行動計画が曖昧',
+      'モチベーション維持の工夫が必要',
+      '進捗を測る指標が未定義',
+    ],
+  },
+  project: {
+    future: [
+      '本格運用中で安定した成果',
+      'プロジェクト完了し成果を活用中',
+      'チームで運用できる体制が整備',
+      '自動化され最小限の管理で運用',
+      '期待以上の成果を達成',
+    ],
+    now: [
+      'MVP開発中で基本機能を実装中',
+      '調査フェーズが完了し計画策定中',
+      '初期テストを実施している段階',
+      'プロトタイプを作成中',
+      'キックオフ直後で体制構築中',
+    ],
+    gap: [
+      '品質向上とテスト強化が必要',
+      'ドキュメント整備が遅れている',
+      'スケジュール遅延のリスクあり',
+      '技術的な課題が未解決',
+      'フィードバックの反映が追いついていない',
+    ],
+  },
+  task: {
+    future: [
+      '完了し次のタスクに移行済み',
+      '期限内に高品質で完了',
+      '成果物が承認され活用されている',
+      'ベストプラクティスとして確立',
+      '定期的に実行される仕組み化',
+    ],
+    now: [
+      '着手したが進捗30%程度',
+      'まだ情報収集の段階',
+      '半分まで進んでいるが停滞中',
+      'レビュー待ちの状態',
+      '優先度を上げて取り組み中',
+    ],
+    gap: [
+      '作業時間の確保が課題',
+      '前提タスクの完了待ち',
+      '技術的な調査が追加で必要',
+      'レビューアーの確保が必要',
+      '要件の明確化が不十分',
+    ],
+  },
+};
+
+function pickMetricText(level: string, field: 'future' | 'now' | 'gap'): string {
+  const texts = METRIC_TEXTS[level]?.[field] ?? METRIC_TEXTS.task[field];
+  return texts[randomInt(0, texts.length - 1)];
+}
+
 let idCounter = 0;
 function nextId(): string {
   return `node-${++idCounter}`;
@@ -208,24 +308,28 @@ function generateTasks(projectName: string): TreeNode[] {
   const tasks: TreeNode[] = [];
   const shuffled = [...TASK_TEMPLATES].sort(() => Math.random() - 0.5);
   for (let i = 0; i < count; i++) {
-    const future = randomInt(50, 100);
-    const now = randomInt(0, future);
     tasks.push({
       id: nextId(),
       label: `${shuffled[i % shuffled.length]}`,
       level: 'task',
       depth: 3,
-      metrics: { future, now, gap: future - now },
+      metrics: {
+        future: pickMetricText('task', 'future'),
+        now: pickMetricText('task', 'now'),
+        gap: pickMetricText('task', 'gap'),
+      },
       timeline: generateTimeline(3)
     });
   }
   return tasks;
 }
 
-function aggregateMetrics(children: TreeNode[]): { future: number; now: number; gap: number } {
-  const future = Math.round(children.reduce((s, c) => s + c.metrics.future, 0) / children.length);
-  const now = Math.round(children.reduce((s, c) => s + c.metrics.now, 0) / children.length);
-  return { future, now, gap: future - now };
+function generateMetricsForLevel(level: string): { future: string; now: string; gap: string } {
+  return {
+    future: pickMetricText(level, 'future'),
+    now: pickMetricText(level, 'now'),
+    gap: pickMetricText(level, 'gap'),
+  };
 }
 
 export function generateDummyData(): ChronoData {
@@ -239,7 +343,7 @@ export function generateDummyData(): ChronoData {
           label: proj,
           level: 'project' as const,
           depth: 2,
-          metrics: aggregateMetrics(tasks),
+          metrics: generateMetricsForLevel('project'),
           timeline: generateTimeline(2),
           children: tasks
         };
@@ -249,7 +353,7 @@ export function generateDummyData(): ChronoData {
         label: goal.name,
         level: 'goal' as const,
         depth: 1,
-        metrics: aggregateMetrics(projects),
+        metrics: generateMetricsForLevel('goal'),
         timeline: generateTimeline(1),
         children: projects
       };
@@ -259,7 +363,7 @@ export function generateDummyData(): ChronoData {
       label: cat.name,
       level: 'category' as const,
       depth: 0,
-      metrics: aggregateMetrics(goals),
+      metrics: generateMetricsForLevel('category'),
       timeline: generateTimeline(0),
       children: goals
     };

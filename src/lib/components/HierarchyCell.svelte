@@ -2,7 +2,7 @@
   import type { FlatRow } from '$lib/types';
   import ExpandToggle from './ExpandToggle.svelte';
 
-  let { row, ontoggle }: { row: FlatRow; ontoggle: (id: string) => void } = $props();
+  let { row, width, ontoggle }: { row: FlatRow; width: number; ontoggle: (id: string) => void } = $props();
 
   const levelLabels = {
     category: 'CAT',
@@ -12,7 +12,7 @@
   };
 </script>
 
-<div class="hierarchy-cell" style:padding-left="{row.depth * 20 + 8}px">
+<div class="hierarchy-cell" style:padding-left="{row.depth * 20 + 8}px" style:min-width="{width}px" style:max-width="{width}px">
   <!-- Indent guides -->
   {#each Array(row.depth) as _, i}
     <div
@@ -39,8 +39,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    min-width: var(--col-hierarchy-w);
-    max-width: var(--col-hierarchy-w);
+    /* width set via inline style */
     height: var(--row-height);
     overflow: hidden;
     white-space: nowrap;

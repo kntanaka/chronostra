@@ -9,9 +9,9 @@ export interface TimelineEntry {
 }
 
 export interface Metrics {
-  future: number;
-  now: number;
-  gap: number;
+  future: string;
+  now: string;
+  gap: string;
 }
 
 export interface TreeNode {

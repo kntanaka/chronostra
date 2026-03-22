@@ -4,8 +4,11 @@
   import MetricCell from './MetricCell.svelte';
   import TimelineCell from './TimelineCell.svelte';
 
-  let { row, ontoggle, onpopup }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, ontoggle, onpopup }: {
     row: FlatRow;
+    hierarchyWidth: number;
+    metricWidths: number[];
+    metricFrozen: boolean[];
     ontoggle: (id: string) => void;
     onpopup: (text: string | null, x: number, y: number) => void;
   } = $props();
@@ -24,7 +27,15 @@
     task: '400'
   };
 
-  const stickyMetricOffsets = [320, 400, 480];
+  const stickyOffsets = $derived(
+    metricWidths.map((_: number, i: number) => {
+      const allPriorFrozen = metricFrozen.slice(0, i).every(Boolean);
+      if (!metricFrozen[i] || !allPriorFrozen) return null;
+      return hierarchyWidth + metricWidths.slice(0, i).reduce((s: number, w: number) => s + w, 0);
+    })
+  );
+
+  const metricTypes = ['future', 'now', 'gap'] as const;
 </script>
 
 <div
@@ -32,20 +43,23 @@
   style:background={bgMap[row.level]}
   style:font-weight={fontWeightMap[row.level]}
 >
-  <HierarchyCell {row} {ontoggle} />
+  <HierarchyCell {row} width={hierarchyWidth} {ontoggle} />
 
-  <!-- Sticky metric cells -->
-  <div class="metric-sticky" style:left="{stickyMetricOffsets[0]}px" style:background={bgMap[row.level]}>
-    <MetricCell value={row.metrics.future} type="future" />
-  </div>
-  <div class="metric-sticky" style:left="{stickyMetricOffsets[1]}px" style:background={bgMap[row.level]}>
-    <MetricCell value={row.metrics.now} type="now" />
-  </div>
-  <div class="metric-sticky" style:left="{stickyMetricOffsets[2]}px" style:background={bgMap[row.level]}>
-    <MetricCell value={row.metrics.gap} type="gap" />
-  </div>
+  {#each metricTypes as type, i}
+    {@const offset = stickyOffsets[i]}
+    <div
+      class="metric-col"
+      class:frozen={offset != null}
+      style:left={offset != null ? `${offset}px` : 'auto'}
+      style:position={offset != null ? 'sticky' : 'relative'}
+      style:background={bgMap[row.level]}
+      style:min-width="{metricWidths[i]}px"
+      style:max-width="{metricWidths[i]}px"
+    >
+      <MetricCell value={row.metrics[type]} {type} width={metricWidths[i]} />
+    </div>
+  {/each}
 
-  <!-- Timeline cells -->
   {#each row.timeline as entry (entry.year)}
     <TimelineCell {entry} {onpopup} />
   {/each}
@@ -62,8 +76,10 @@
   .table-row:hover {
     filter: brightness(1.1);
   }
-  .metric-sticky {
-    position: sticky;
+  .metric-col {
+    z-index: 0;
+  }
+  .metric-col.frozen {
     z-index: 1;
   }
 </style>
