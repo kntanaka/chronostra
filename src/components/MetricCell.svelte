@@ -3,10 +3,10 @@
 
   const color = $derived(
     type === 'gap'
-      ? 'var(--gap-negative)'
+      ? 'var(--chronostra-gap-negative)'
       : type === 'now'
-        ? 'var(--text-secondary)'
-        : 'var(--text-primary)'
+        ? 'var(--text-muted)'
+        : 'var(--text-normal)'
   );
 </script>
 
@@ -18,7 +18,7 @@
   .metric-cell {
     display: flex;
     align-items: center;
-    height: var(--row-height);
+    height: var(--chronostra-row-height);
     padding: 0 8px;
     font-size: 11px;
     background: inherit;

@@ -1,0 +1,33 @@
+.chronostra-container {
+  /* Hierarchy level backgrounds */
+  --chronostra-bg-category: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+  --chronostra-bg-goal: color-mix(in srgb, #4ade80 10%, var(--background-primary));
+  --chronostra-bg-project: color-mix(in srgb, #fbbf24 8%, var(--background-primary));
+  --chronostra-bg-task: var(--background-secondary);
+
+  /* Semantic colors */
+  --chronostra-gap-positive: #4ade80;
+  --chronostra-gap-negative: #f87171;
+  --chronostra-gap-zero: var(--text-muted);
+
+  /* Layout */
+  --chronostra-col-timeline-w: 100px;
+  --chronostra-row-height: 36px;
+
+  /* Fill available space */
+  width: 100%;
+  height: 80vh;
+  overflow: hidden;
+  font-family: var(--font-interface);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-normal);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.chronostra-error {
+  padding: 12px;
+  color: var(--text-error);
+  font-size: 13px;
+}

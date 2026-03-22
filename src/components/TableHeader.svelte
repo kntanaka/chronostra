@@ -55,23 +55,23 @@
     resizing = null;
   }
 
-  // Context menu state
-  let contextMenu = $state<{ index: number; x: number; y: number } | null>(null);
+  // Context menu state — just tracks which column index is open
+  let contextMenuIndex = $state<number | null>(null);
 
   function onContextMenu(e: MouseEvent, index: number) {
     e.preventDefault();
-    contextMenu = { index, x: e.clientX, y: e.clientY };
+    contextMenuIndex = index;
   }
 
   function handleToggleFreeze() {
-    if (contextMenu) {
-      ontogglefreeze(contextMenu.index);
-      contextMenu = null;
+    if (contextMenuIndex != null) {
+      ontogglefreeze(contextMenuIndex);
+      contextMenuIndex = null;
     }
   }
 
   function closeContextMenu() {
-    contextMenu = null;
+    contextMenuIndex = null;
   }
 </script>
 
@@ -111,6 +111,13 @@
         class:active={resizing?.target === i}
         onpointerdown={(e) => onPointerDown(e, i)}
       ></div>
+      {#if contextMenuIndex === i}
+        <div class="context-menu">
+          <button class="context-item" onclick={handleToggleFreeze}>
+            {metricFrozen[i] ? '☐ Unfreeze column' : '☑ Freeze column'}
+          </button>
+        </div>
+      {/if}
     </div>
   {/each}
 
@@ -119,17 +126,6 @@
   {/each}
 </div>
 
-{#if contextMenu}
-  <div
-    class="context-menu"
-    style:left="{contextMenu.x}px"
-    style:top="{contextMenu.y}px"
-  >
-    <button class="context-item" onclick={handleToggleFreeze}>
-      {metricFrozen[contextMenu.index] ? '☐ Unfreeze column' : '☑ Freeze column'}
-    </button>
-  </div>
-{/if}
 
 <style>
   .table-header {
@@ -139,18 +135,18 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--bg-base);
-    border-bottom: 2px solid var(--border-subtle);
+    background: var(--background-primary);
+    border-bottom: 2px solid var(--background-modifier-border);
   }
   .header-cell {
     display: flex;
     align-items: center;
-    height: var(--row-height);
+    height: var(--chronostra-row-height);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
+    color: var(--text-faint);
     box-sizing: border-box;
     position: relative;
   }
@@ -159,14 +155,14 @@
     left: 0;
     z-index: 3;
     padding: 0 12px;
-    background: var(--bg-base);
+    background: var(--background-primary);
     user-select: none;
   }
   .metric-header {
     z-index: 2;
     justify-content: flex-start;
     padding: 0 10px;
-    background: var(--bg-base);
+    background: var(--background-primary);
     user-select: none;
     gap: 4px;
   }
@@ -178,8 +174,8 @@
     opacity: 0.4;
   }
   .timeline-header {
-    min-width: var(--col-timeline-w);
-    max-width: var(--col-timeline-w);
+    min-width: var(--chronostra-col-timeline-w);
+    max-width: var(--chronostra-col-timeline-w);
     justify-content: center;
   }
   .resize-handle {
@@ -194,13 +190,15 @@
   }
   .resize-handle:hover,
   .resize-handle.active {
-    background: var(--accent);
+    background: var(--interactive-accent);
   }
   .context-menu {
-    position: fixed;
+    position: absolute;
+    top: 100%;
+    left: 0;
     z-index: 100;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     padding: 4px 0;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -211,7 +209,7 @@
     width: 100%;
     padding: 6px 14px;
     font-size: 12px;
-    color: var(--text-primary);
+    color: var(--text-normal);
     background: none;
     border: none;
     cursor: pointer;

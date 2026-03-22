@@ -1,4 +1,4 @@
-import type { TreeNode, FlatRow } from '$lib/types';
+import type { TreeNode, FlatRow } from '../types';
 import type { TreeState } from './tree-state.svelte';
 
 export function flattenTree(

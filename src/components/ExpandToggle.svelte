@@ -28,7 +28,7 @@
     height: 20px;
     border: none;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-faint);
     cursor: pointer;
     padding: 0;
     border-radius: 3px;
@@ -36,7 +36,7 @@
     flex-shrink: 0;
   }
   .expand-toggle:hover {
-    color: var(--text-secondary);
+    color: var(--text-muted);
     background: rgba(255, 255, 255, 0.05);
   }
   .expand-toggle.expanded {

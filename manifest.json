@@ -1,0 +1,9 @@
+{
+  "id": "chronostra",
+  "name": "Chronostra",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Hierarchical life-planning table with virtual scrolling and timeline view",
+  "author": "Chronostra",
+  "isDesktopOnly": true
+}

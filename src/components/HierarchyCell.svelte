@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FlatRow } from '$lib/types';
+  import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
   let { row, width, ontoggle }: { row: FlatRow; width: number; ontoggle: (id: string) => void } = $props();
@@ -33,14 +33,10 @@
 
 <style>
   .hierarchy-cell {
-    position: sticky;
-    left: 0;
-    z-index: 2;
     display: flex;
     align-items: center;
     gap: 6px;
-    /* width set via inline style */
-    height: var(--row-height);
+    height: var(--chronostra-row-height);
     overflow: hidden;
     white-space: nowrap;
     box-sizing: border-box;
@@ -51,7 +47,7 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: var(--border-subtle);
+    background: var(--background-modifier-border);
     opacity: 0.4;
   }
   .toggle-spacer {
@@ -70,11 +66,11 @@
   }
   .level-badge.level-category {
     background: rgba(124, 111, 239, 0.2);
-    color: var(--accent);
+    color: var(--interactive-accent);
   }
   .level-badge.level-goal {
     background: rgba(74, 222, 128, 0.15);
-    color: var(--gap-positive);
+    color: var(--chronostra-gap-positive);
   }
   .level-badge.level-project {
     background: rgba(251, 191, 36, 0.15);
@@ -82,7 +78,7 @@
   }
   .level-badge.level-task {
     background: rgba(136, 136, 160, 0.15);
-    color: var(--text-secondary);
+    color: var(--text-muted);
   }
   .label {
     overflow: hidden;

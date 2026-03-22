@@ -16,11 +16,11 @@
     z-index: 100;
     max-width: 320px;
     padding: 8px 12px;
-    background: #2a2a3d;
-    border: 1px solid var(--border-subtle);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    color: var(--text-primary);
+    color: var(--text-normal);
     font-size: 12px;
     line-height: 1.6;
     white-space: pre-wrap;

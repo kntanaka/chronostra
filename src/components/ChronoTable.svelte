@@ -1,20 +1,33 @@
 <script lang="ts">
-  import type { ChronoData } from '$lib/types';
-  import { TreeState } from '$lib/stores/tree-state.svelte';
-  import { flattenTree } from '$lib/stores/flat-rows.svelte';
-  import { createVirtualizer } from '$lib/virtualizer/create-virtualizer.svelte';
+  import type { ChronoData } from '../types';
+  import { TreeState } from '../stores/tree-state.svelte';
+  import { flattenTree } from '../stores/flat-rows.svelte';
+  import { createVirtualizer } from '../virtualizer/create-virtualizer.svelte';
   import TableHeader from './TableHeader.svelte';
   import TableRow from './TableRow.svelte';
   import CellPopup from './CellPopup.svelte';
 
-  let { data }: { data: ChronoData } = $props();
+  let {
+    data,
+    initialExpandedIds = [],
+    onExpandChange,
+  }: {
+    data: ChronoData;
+    initialExpandedIds?: string[];
+    onExpandChange?: (expandedIds: string[]) => void;
+  } = $props();
 
   const treeState = new TreeState();
 
-  // Start with categories expanded
+  // Restore persisted expand state
   $effect(() => {
-    const categoryIds = data.categories.map((c) => c.id);
-    treeState.expanded = new Set(categoryIds);
+    if (initialExpandedIds.length > 0) {
+      treeState.expanded = new Set(initialExpandedIds);
+    } else {
+      // Default: expand categories
+      const categoryIds = data.categories.map((c) => c.id);
+      treeState.expanded = new Set(categoryIds);
+    }
   });
 
   let flatRows = $derived(flattenTree(data.categories, treeState));
@@ -30,14 +43,17 @@
 
   function handleToggle(id: string) {
     treeState.toggle(id);
+    onExpandChange?.([...treeState.expanded]);
   }
 
   function expandAll() {
     treeState.expandAll(data.categories);
+    onExpandChange?.([...treeState.expanded]);
   }
 
   function collapseAll() {
     treeState.collapseAll();
+    onExpandChange?.([...treeState.expanded]);
   }
 
   let hierarchyWidth = $state(320);
@@ -54,6 +70,16 @@
 
   function handleToggleFreeze(index: number) {
     metricFrozen[index] = !metricFrozen[index];
+  }
+
+  // Track horizontal scroll for frozen columns in data rows
+  // (sticky doesn't work inside position:absolute virtual rows)
+  let scrollLeft = $state(0);
+
+  function handleScroll() {
+    if (scrollContainer) {
+      scrollLeft = scrollContainer.scrollLeft;
+    }
   }
 
   let popupText = $state<string | null>(null);
@@ -75,7 +101,7 @@
     <button class="tool-btn" onclick={collapseAll}>Collapse All</button>
   </div>
 
-  <div class="scroll-container" bind:this={scrollContainer}>
+  <div class="scroll-container" bind:this={scrollContainer} onscroll={handleScroll}>
     <TableHeader {hierarchyWidth} {metricWidths} {metricFrozen} onhierarchyresize={handleHierarchyResize} onresize={handleMetricResize} ontogglefreeze={handleToggleFreeze} />
 
     {#if virt.instance}
@@ -97,7 +123,7 @@
               style:min-width="100%"
               style:height="{virtualRow.size}px"
             >
-              <TableRow {row} {hierarchyWidth} {metricWidths} {metricFrozen} ontoggle={handleToggle} onpopup={handlePopup} />
+              <TableRow {row} {hierarchyWidth} {metricWidths} {metricFrozen} {scrollLeft} ontoggle={handleToggle} onpopup={handlePopup} />
             </div>
           {/if}
         {/each}
@@ -114,8 +140,8 @@
   .chrono-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    background: var(--bg-base);
+    height: 100%;
+    background: var(--background-primary);
     overflow: hidden;
   }
   .toolbar {
@@ -123,35 +149,35 @@
     align-items: center;
     gap: 12px;
     padding: 8px 16px;
-    background: var(--bg-surface);
-    border-bottom: 1px solid var(--border-subtle);
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
   }
   .title {
     font-weight: 700;
     font-size: 15px;
-    color: var(--text-primary);
+    color: var(--text-normal);
     letter-spacing: -0.3px;
   }
   .row-count {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-faint);
     padding: 2px 8px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
   }
   .tool-btn {
     font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     background: transparent;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--background-modifier-border);
     padding: 3px 10px;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
   }
   .tool-btn:hover {
-    color: var(--text-primary);
+    color: var(--text-normal);
     background: rgba(255, 255, 255, 0.05);
   }
   .scroll-container {
@@ -160,9 +186,7 @@
     position: relative;
   }
   .virtual-list {
-    will-change: transform;
   }
   .virtual-row {
-    will-change: transform;
   }
 </style>

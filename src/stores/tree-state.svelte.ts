@@ -1,4 +1,4 @@
-import type { TreeNode } from '$lib/types';
+import type { TreeNode } from '../types';
 
 export class TreeState {
   expanded = $state<Set<string>>(new Set());

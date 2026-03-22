@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineEntry } from '$lib/types';
+  import type { TimelineEntry } from '../types';
 
   let {
     entry,
@@ -14,10 +14,10 @@
   const statusColor = $derived(() => {
     if (!entry.status || !entry.text) return 'transparent';
     switch (entry.status) {
-      case 'completed': return 'var(--gap-positive)';
-      case 'active': return 'var(--accent)';
-      case 'at-risk': return 'var(--gap-negative)';
-      case 'planned': return 'var(--text-muted)';
+      case 'completed': return 'var(--chronostra-gap-positive)';
+      case 'active': return 'var(--interactive-accent)';
+      case 'at-risk': return 'var(--chronostra-gap-negative)';
+      case 'planned': return 'var(--text-faint)';
       default: return 'transparent';
     }
   });
@@ -52,12 +52,12 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    min-width: var(--col-timeline-w);
-    max-width: var(--col-timeline-w);
-    height: var(--row-height);
+    min-width: var(--chronostra-col-timeline-w);
+    max-width: var(--chronostra-col-timeline-w);
+    height: var(--chronostra-row-height);
     padding: 0 6px;
     font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     box-sizing: border-box;
     overflow: hidden;
     cursor: default;
