@@ -136,17 +136,17 @@
     top: 0;
     z-index: 10;
     background: var(--background-primary);
-    border-bottom: 2px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--text-faint);
   }
   .header-cell {
     display: flex;
     align-items: center;
     height: var(--chronostra-row-height);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
     box-sizing: border-box;
     position: relative;
   }
@@ -170,45 +170,43 @@
     z-index: 2;
   }
   .unfreeze-icon {
-    font-size: 9px;
-    opacity: 0.4;
+    font-size: 8px;
+    opacity: 0.3;
   }
   .timeline-header {
     min-width: var(--chronostra-col-timeline-w);
     max-width: var(--chronostra-col-timeline-w);
     justify-content: center;
+    font-variant-numeric: tabular-nums;
   }
   .resize-handle {
     position: absolute;
     right: 0;
     top: 0;
     bottom: 0;
-    width: 5px;
+    width: 4px;
     cursor: col-resize;
     background: transparent;
-    transition: background 0.15s;
   }
   .resize-handle:hover,
   .resize-handle.active {
-    background: var(--interactive-accent);
+    background: var(--text-faint);
   }
   .context-menu {
     position: absolute;
     top: 100%;
     left: 0;
     z-index: 100;
-    background: var(--background-secondary);
+    background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
     padding: 4px 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    min-width: 160px;
+    min-width: 140px;
   }
   .context-item {
     display: block;
     width: 100%;
-    padding: 6px 14px;
-    font-size: 12px;
+    padding: 5px 12px;
+    font-size: 11px;
     color: var(--text-normal);
     background: none;
     border: none;
@@ -216,6 +214,6 @@
     text-align: left;
   }
   .context-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--background-secondary);
   }
 </style>

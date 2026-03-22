@@ -1,4 +1,4 @@
-import { Plugin, MarkdownPostProcessorContext } from 'obsidian';
+import { Plugin, MarkdownPostProcessorContext, TFile } from 'obsidian';
 import { mount, unmount } from 'svelte';
 import ChronoTable from './components/ChronoTable.svelte';
 import {
@@ -6,8 +6,8 @@ import {
   DEFAULT_SETTINGS,
   ChronostraSettingTab,
 } from './settings';
-import { buildTreeFromFlatItems } from './parser';
-import type { FlatItem } from './types';
+import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
+import type { FlatItem, ChronoData } from './types';
 
 export default class ChronostraPlugin extends Plugin {
   settings: ChronostraSettings = DEFAULT_SETTINGS;
@@ -16,7 +16,6 @@ export default class ChronostraPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    // Render future-data code blocks inline as Chronostra table
     this.registerMarkdownCodeBlockProcessor(
       'future-data',
       (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
@@ -28,7 +27,6 @@ export default class ChronostraPlugin extends Plugin {
   }
 
   async onunload() {
-    // Clean up all mounted Svelte instances
     for (const [el, instance] of this.svelteInstances) {
       unmount(instance);
     }
@@ -53,7 +51,7 @@ export default class ChronostraPlugin extends Plugin {
 
     const data = buildTreeFromFlatItems(flatItems);
 
-    // Remove readable line width constraint - find the sizer element
+    // Remove readable line width constraint
     setTimeout(() => {
       let ancestor: HTMLElement | null = el.parentElement;
       while (ancestor) {
@@ -63,7 +61,6 @@ export default class ChronostraPlugin extends Plugin {
           ancestor.style.maxWidth = 'none';
           break;
         }
-        // Also check for inline max-width style
         const computed = getComputedStyle(ancestor);
         const mw = parseInt(computed.maxWidth);
         if (mw > 0 && mw < 2000) {
@@ -84,12 +81,14 @@ export default class ChronostraPlugin extends Plugin {
           this.settings.expandedIds = expandedIds;
           this.saveSettings();
         },
+        onDataChange: (updatedData: ChronoData) => {
+          this.saveDataToFile(updatedData, ctx.sourcePath);
+        },
       },
     });
 
     this.svelteInstances.set(el, instance);
 
-    // Clean up when the code block is removed from DOM
     const observer = new MutationObserver(() => {
       if (!el.isConnected) {
         unmount(instance);
@@ -98,6 +97,20 @@ export default class ChronostraPlugin extends Plugin {
       }
     });
     observer.observe(el.parentElement || document.body, { childList: true, subtree: true });
+  }
+
+  /** Write updated data back to the markdown file's future-data code block */
+  private async saveDataToFile(data: ChronoData, sourcePath: string) {
+    const file = this.app.vault.getAbstractFileByPath(sourcePath);
+    if (!file || !(file instanceof TFile)) return;
+
+    const flatItems = flattenTreeToItems(data);
+    const newJson = JSON.stringify(flatItems, null, 2);
+
+    await this.app.vault.process(file as any, (content: string) => {
+      const regex = /```future-data\s*\n[\s\S]*?\n```/;
+      return content.replace(regex, '```future-data\n' + newJson + '\n```');
+    });
   }
 
   async loadSettings() {

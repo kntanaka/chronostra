@@ -14,9 +14,9 @@
   const statusColor = $derived(() => {
     if (!entry.status || !entry.text) return 'transparent';
     switch (entry.status) {
-      case 'completed': return 'var(--chronostra-gap-positive)';
-      case 'active': return 'var(--interactive-accent)';
-      case 'at-risk': return 'var(--chronostra-gap-negative)';
+      case 'completed': return 'var(--text-normal)';
+      case 'active': return 'var(--text-muted)';
+      case 'at-risk': return 'var(--text-muted)';
       case 'planned': return 'var(--text-faint)';
       default: return 'transparent';
     }
@@ -51,20 +51,20 @@
   .timeline-cell {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     min-width: var(--chronostra-col-timeline-w);
     max-width: var(--chronostra-col-timeline-w);
     height: var(--chronostra-row-height);
     padding: 0 6px;
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-faint);
     box-sizing: border-box;
     overflow: hidden;
     cursor: default;
   }
   .status-dot {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
     flex-shrink: 0;
   }

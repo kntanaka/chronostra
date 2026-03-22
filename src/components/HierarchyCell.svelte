@@ -2,7 +2,15 @@
   import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
-  let { row, width, ontoggle }: { row: FlatRow; width: number; ontoggle: (id: string) => void } = $props();
+  let { row, width, ontoggle, onlabelchange }: {
+    row: FlatRow;
+    width: number;
+    ontoggle: (id: string) => void;
+    onlabelchange?: (id: string, newLabel: string) => void;
+  } = $props();
+
+  let editing = $state(false);
+  let editValue = $state('');
 
   const levelLabels = {
     category: 'CAT',
@@ -10,10 +18,30 @@
     project: 'PROJ',
     task: 'TASK'
   };
+
+  function startEdit() {
+    if (!onlabelchange) return;
+    editing = true;
+    editValue = row.label;
+  }
+
+  function commitEdit() {
+    if (editing && editValue.trim() && editValue !== row.label) {
+      onlabelchange?.(row.id, editValue.trim());
+    }
+    editing = false;
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      editing = false;
+    }
+  }
 </script>
 
 <div class="hierarchy-cell" style:padding-left="{row.depth * 20 + 8}px" style:min-width="{width}px" style:max-width="{width}px">
-  <!-- Indent guides -->
   {#each Array(row.depth) as _, i}
     <div
       class="indent-guide"
@@ -28,7 +56,24 @@
   {/if}
 
   <span class="level-badge level-{row.level}">{levelLabels[row.level]}</span>
-  <span class="label" title={row.label}>{row.label}</span>
+
+  {#if editing}
+    <input
+      class="label-input"
+      type="text"
+      bind:value={editValue}
+      onblur={commitEdit}
+      onkeydown={handleKeydown}
+      autofocus
+    />
+  {:else}
+    <span
+      class="label"
+      class:editable={!!onlabelchange}
+      title={row.label}
+      ondblclick={startEdit}
+    >{row.label}</span>
+  {/if}
 </div>
 
 <style>
@@ -57,32 +102,52 @@
   }
   .level-badge {
     font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    padding: 1px 4px;
-    border-radius: 3px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    padding: 0;
     flex-shrink: 0;
-    opacity: 0.7;
+    text-transform: uppercase;
+    color: var(--text-faint);
   }
   .level-badge.level-category {
-    background: rgba(124, 111, 239, 0.2);
-    color: var(--interactive-accent);
+    color: var(--text-muted);
+    font-weight: 600;
   }
   .level-badge.level-goal {
-    background: rgba(74, 222, 128, 0.15);
-    color: var(--chronostra-gap-positive);
+    color: var(--text-faint);
   }
   .level-badge.level-project {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
+    color: var(--text-faint);
   }
   .level-badge.level-task {
-    background: rgba(136, 136, 160, 0.15);
-    color: var(--text-muted);
+    color: var(--text-faint);
+    font-size: 8px;
   }
   .label {
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+  }
+  .label.editable {
+    cursor: text;
+  }
+  .label.editable:hover {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+  }
+  .label-input {
+    flex: 1;
+    min-width: 0;
+    height: calc(var(--chronostra-row-height) - 12px);
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+    color: var(--text-normal);
+    background: var(--background-primary);
+    border: 1px solid var(--interactive-accent);
+    border-radius: 3px;
+    padding: 0 4px;
+    outline: none;
   }
 </style>

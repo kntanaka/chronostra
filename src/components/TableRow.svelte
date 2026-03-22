@@ -4,7 +4,7 @@
   import MetricCell from './MetricCell.svelte';
   import TimelineCell from './TimelineCell.svelte';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, scrollLeft, ontoggle, onpopup }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, scrollLeft, ontoggle, onpopup, onmetricchange, onlabelchange, onrowcontextmenu }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
@@ -12,6 +12,9 @@
     scrollLeft: number;
     ontoggle: (id: string) => void;
     onpopup: (text: string | null, x: number, y: number) => void;
+    onmetricchange?: (id: string, type: 'future' | 'now' | 'gap', value: string) => void;
+    onlabelchange?: (id: string, newLabel: string) => void;
+    onrowcontextmenu?: (e: MouseEvent, rowId: string) => void;
   } = $props();
 
   const bgMap = {
@@ -30,21 +33,24 @@
 
   const metricTypes = ['future', 'now', 'gap'] as const;
 
-  // Compute frozen state for metric columns
   const frozenFlags = $derived(
     metricWidths.map((_: number, i: number) => {
       const allPriorFrozen = metricFrozen.slice(0, i).every(Boolean);
       return metricFrozen[i] && allPriorFrozen;
     })
   );
+
+  function handleContextMenu(e: MouseEvent) {
+    onrowcontextmenu?.(e, row.id);
+  }
 </script>
 
 <div
   class="table-row"
   style:background={bgMap[row.level]}
   style:font-weight={fontWeightMap[row.level]}
+  oncontextmenu={handleContextMenu}
 >
-  <!-- Hierarchy cell: use transform to simulate sticky -->
   <div
     class="hierarchy-wrap frozen"
     style:transform="translateX({scrollLeft}px)"
@@ -52,7 +58,7 @@
     style:max-width="{hierarchyWidth}px"
     style:background={bgMap[row.level]}
   >
-    <HierarchyCell {row} width={hierarchyWidth} {ontoggle} />
+    <HierarchyCell {row} width={hierarchyWidth} {ontoggle} {onlabelchange} />
   </div>
 
   {#each metricTypes as type, i}
@@ -65,7 +71,12 @@
       style:min-width="{metricWidths[i]}px"
       style:max-width="{metricWidths[i]}px"
     >
-      <MetricCell value={row.metrics[type]} {type} width={metricWidths[i]} />
+      <MetricCell
+        value={row.metrics[type]}
+        {type}
+        width={metricWidths[i]}
+        onchange={onmetricchange ? (v) => onmetricchange(row.id, type, v) : undefined}
+      />
     </div>
   {/each}
 
@@ -80,10 +91,9 @@
     width: max-content;
     min-width: 100%;
     border-bottom: 1px solid var(--background-modifier-border);
-    transition: filter 0.1s ease;
   }
   .table-row:hover {
-    filter: brightness(1.1);
+    background: var(--background-secondary) !important;
   }
   .hierarchy-wrap {
     z-index: 2;

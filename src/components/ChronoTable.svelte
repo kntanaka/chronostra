@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ChronoData } from '../types';
+  import type { ChronoData, TreeNode } from '../types';
   import { TreeState } from '../stores/tree-state.svelte';
   import { flattenTree } from '../stores/flat-rows.svelte';
   import { createVirtualizer } from '../virtualizer/create-virtualizer.svelte';
@@ -8,23 +8,26 @@
   import CellPopup from './CellPopup.svelte';
 
   let {
-    data,
+    data: initialData,
     initialExpandedIds = [],
     onExpandChange,
+    onDataChange,
   }: {
     data: ChronoData;
     initialExpandedIds?: string[];
     onExpandChange?: (expandedIds: string[]) => void;
+    onDataChange?: (data: ChronoData) => void;
   } = $props();
+
+  // Mutable copy of the data tree
+  let data = $state<ChronoData>(structuredClone(initialData));
 
   const treeState = new TreeState();
 
-  // Restore persisted expand state
   $effect(() => {
     if (initialExpandedIds.length > 0) {
       treeState.expanded = new Set(initialExpandedIds);
     } else {
-      // Default: expand categories
       const categoryIds = data.categories.map((c) => c.id);
       treeState.expanded = new Set(categoryIds);
     }
@@ -72,8 +75,6 @@
     metricFrozen[index] = !metricFrozen[index];
   }
 
-  // Track horizontal scroll for frozen columns in data rows
-  // (sticky doesn't work inside position:absolute virtual rows)
   let scrollLeft = $state(0);
 
   function handleScroll() {
@@ -91,7 +92,117 @@
     popupX = x;
     popupY = y;
   }
+
+  // --- Data mutation helpers ---
+
+  function findNode(nodes: TreeNode[], id: string): TreeNode | null {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNode(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function findParentAndIndex(nodes: TreeNode[], id: string, parent: TreeNode[] | null = null): { parent: TreeNode[]; index: number } | null {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].id === id) return { parent: nodes, index: i };
+      if (nodes[i].children) {
+        const found = findParentAndIndex(nodes[i].children!, id, nodes);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function emitChange() {
+    data = { ...data };
+    onDataChange?.(data);
+  }
+
+  function handleMetricChange(id: string, type: 'future' | 'now' | 'gap', value: string) {
+    const node = findNode(data.categories, id);
+    if (node) {
+      node.metrics[type] = value;
+      emitChange();
+    }
+  }
+
+  function handleLabelChange(id: string, newLabel: string) {
+    const node = findNode(data.categories, id);
+    if (node) {
+      node.label = newLabel;
+      emitChange();
+    }
+  }
+
+  function generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function addChild(parentId: string) {
+    const node = findNode(data.categories, parentId);
+    if (!node) return;
+    if (!node.children) node.children = [];
+    const LEVEL_MAP = ['category', 'goal', 'project', 'task'] as const;
+    const childLevel = LEVEL_MAP[Math.min(node.depth + 1, LEVEL_MAP.length - 1)];
+    node.children.push({
+      id: generateId(),
+      label: 'New Item',
+      level: childLevel,
+      depth: node.depth + 1,
+      metrics: { future: '', now: '', gap: '' },
+      timeline: [],
+    });
+    treeState.expanded.add(parentId);
+    emitChange();
+  }
+
+  function addSibling(id: string) {
+    const loc = findParentAndIndex(data.categories, id);
+    if (!loc) return;
+    const sibling = loc.parent[loc.index];
+    loc.parent.splice(loc.index + 1, 0, {
+      id: generateId(),
+      label: 'New Item',
+      level: sibling.level,
+      depth: sibling.depth,
+      metrics: { future: '', now: '', gap: '' },
+      timeline: [],
+    });
+    emitChange();
+  }
+
+  function deleteRow(id: string) {
+    const loc = findParentAndIndex(data.categories, id);
+    if (!loc) return;
+    loc.parent.splice(loc.index, 1);
+    emitChange();
+  }
+
+  // --- Row context menu ---
+  let rowMenu = $state<{ id: string; x: number; y: number } | null>(null);
+
+  function handleRowContextMenu(e: MouseEvent, rowId: string) {
+    e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    rowMenu = { id: rowId, x: e.clientX - rect.left, y: e.clientY - rect.top };
+    // Position relative to scroll container
+    if (scrollContainer) {
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      rowMenu = { id: rowId, x: e.clientX - scrollRect.left + scrollContainer.scrollLeft, y: e.clientY - scrollRect.top + scrollContainer.scrollTop };
+    }
+  }
+
+  function closeRowMenu() {
+    rowMenu = null;
+  }
 </script>
+
+<svelte:window onclick={closeRowMenu} />
 
 <div class="chrono-wrapper">
   <div class="toolbar">
@@ -99,6 +210,17 @@
     <span class="row-count">{flatRows.length} rows</span>
     <button class="tool-btn" onclick={expandAll}>Expand All</button>
     <button class="tool-btn" onclick={collapseAll}>Collapse All</button>
+    <button class="tool-btn add-btn" onclick={() => {
+      data.categories.push({
+        id: generateId(),
+        label: 'New Category',
+        level: 'category',
+        depth: 0,
+        metrics: { future: '', now: '', gap: '' },
+        timeline: [],
+      });
+      emitChange();
+    }}>+ Add Category</button>
   </div>
 
   <div class="scroll-container" bind:this={scrollContainer} onscroll={handleScroll}>
@@ -123,10 +245,39 @@
               style:min-width="100%"
               style:height="{virtualRow.size}px"
             >
-              <TableRow {row} {hierarchyWidth} {metricWidths} {metricFrozen} {scrollLeft} ontoggle={handleToggle} onpopup={handlePopup} />
+              <TableRow
+                {row}
+                {hierarchyWidth}
+                {metricWidths}
+                {metricFrozen}
+                {scrollLeft}
+                ontoggle={handleToggle}
+                onpopup={handlePopup}
+                onmetricchange={handleMetricChange}
+                onlabelchange={handleLabelChange}
+                onrowcontextmenu={handleRowContextMenu}
+              />
             </div>
           {/if}
         {/each}
+      </div>
+    {/if}
+
+    {#if rowMenu}
+      <div
+        class="row-context-menu"
+        style:left="{rowMenu.x}px"
+        style:top="{rowMenu.y}px"
+      >
+        <button class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
+          + Add Child
+        </button>
+        <button class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
+          + Add Sibling
+        </button>
+        <button class="context-item danger" onclick={() => { deleteRow(rowMenu!.id); closeRowMenu(); }}>
+          Delete
+        </button>
       </div>
     {/if}
   </div>
@@ -147,38 +298,39 @@
   .toolbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
-    background: var(--background-secondary);
+    gap: 16px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
   }
   .title {
-    font-weight: 700;
-    font-size: 15px;
+    font-weight: 600;
+    font-size: 13px;
     color: var(--text-normal);
-    letter-spacing: -0.3px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
   .row-count {
     font-size: 11px;
     color: var(--text-faint);
-    padding: 2px 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
   }
   .tool-btn {
     font-size: 11px;
     color: var(--text-muted);
     background: transparent;
-    border: 1px solid var(--background-modifier-border);
-    padding: 3px 10px;
-    border-radius: 4px;
+    border: none;
+    padding: 4px 0;
     cursor: pointer;
-    transition: all 0.15s ease;
+    text-decoration: none;
+    letter-spacing: 0.02em;
   }
   .tool-btn:hover {
     color: var(--text-normal);
-    background: rgba(255, 255, 255, 0.05);
+    text-decoration: underline;
+  }
+  .add-btn {
+    margin-left: auto;
   }
   .scroll-container {
     flex: 1;
@@ -188,5 +340,34 @@
   .virtual-list {
   }
   .virtual-row {
+  }
+  .row-context-menu {
+    position: absolute;
+    z-index: 100;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    padding: 4px 0;
+    min-width: 140px;
+  }
+  .context-item {
+    display: block;
+    width: 100%;
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--text-normal);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    letter-spacing: 0.01em;
+  }
+  .context-item:hover {
+    background: var(--background-secondary);
+  }
+  .context-item.danger {
+    color: var(--text-muted);
+  }
+  .context-item.danger:hover {
+    color: var(--text-normal);
   }
 </style>
