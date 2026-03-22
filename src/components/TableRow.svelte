@@ -31,6 +31,15 @@
     task: '400'
   };
 
+  const TIMELINE_START = 2025;
+  const TIMELINE_END = 2050;
+  const years = Array.from({ length: TIMELINE_END - TIMELINE_START + 1 }, (_, i) => TIMELINE_START + i);
+
+  // Map timeline entries by year for O(1) lookup
+  const timelineByYear = $derived(
+    new Map(row.timeline.map(e => [e.year, e]))
+  );
+
   const metricTypes = ['future', 'now', 'gap'] as const;
 
   const frozenFlags = $derived(
@@ -80,7 +89,8 @@
     </div>
   {/each}
 
-  {#each row.timeline as entry (entry.year)}
+  {#each years as year (year)}
+    {@const entry = timelineByYear.get(year) ?? { year, text: '' }}
     <TimelineCell {entry} {onpopup} />
   {/each}
 </div>

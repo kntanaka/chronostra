@@ -208,9 +208,19 @@
   <div class="toolbar">
     <span class="title">Chronostra</span>
     <span class="row-count">{flatRows.length} rows</span>
-    <button class="tool-btn" onclick={expandAll}>Expand All</button>
-    <button class="tool-btn" onclick={collapseAll}>Collapse All</button>
-    <button class="tool-btn add-btn" onclick={() => {
+    <div class="toolbar-actions">
+      <button class="icon-btn" onclick={expandAll} title="Expand All">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 5.5L7 9.5L11 5.5" />
+        </svg>
+      </button>
+      <button class="icon-btn" onclick={collapseAll} title="Collapse All">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 9.5L7 5.5L11 9.5" />
+        </svg>
+      </button>
+    </div>
+    <button class="add-btn" onclick={() => {
       data.categories.push({
         id: generateId(),
         label: 'New Category',
@@ -315,22 +325,40 @@
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
   }
-  .tool-btn {
+  .toolbar-actions {
+    display: flex;
+    gap: 2px;
+  }
+  .icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .icon-btn:hover {
+    color: var(--text-normal);
+    border-color: var(--background-modifier-border);
+  }
+  .add-btn {
+    margin-left: auto;
     font-size: 11px;
     color: var(--text-muted);
     background: transparent;
     border: none;
     padding: 4px 0;
     cursor: pointer;
-    text-decoration: none;
     letter-spacing: 0.02em;
   }
-  .tool-btn:hover {
+  .add-btn:hover {
     color: var(--text-normal);
     text-decoration: underline;
-  }
-  .add-btn {
-    margin-left: auto;
   }
   .scroll-container {
     flex: 1;
