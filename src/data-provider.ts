@@ -73,7 +73,7 @@ export class DataProvider {
     if (this.isSaving) return;
     if (Date.now() - this.lastWriteTime < this.writeDebounceMs) return;
 
-    this.load().then(onUpdate);
+    void this.load().then(onUpdate);
   }
 
   private extractFutureDataBlock(content: string): string | null {

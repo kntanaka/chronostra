@@ -28,7 +28,7 @@ export class ChronostraSettingTab extends PluginSettingTab {
       .setDesc('Path to the Markdown file containing the future-data code block')
       .addText((text) =>
         text
-          .setPlaceholder('Future Plan.md')
+          .setPlaceholder('Future plan.md')
           .setValue(this.plugin.settings.targetFilePath)
           .onChange(async (value) => {
             this.plugin.settings.targetFilePath = value;

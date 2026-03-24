@@ -1,3 +1,7 @@
+.chronostra-full-width {
+  max-width: none !important;
+}
+
 .chronostra-container {
   /* Hierarchy — monochrome, differentiated by opacity */
   --chronostra-bg-category: var(--background-primary);

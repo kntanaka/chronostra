@@ -26,9 +26,9 @@ export default class ChronostraPlugin extends Plugin {
     this.addSettingTab(new ChronostraSettingTab(this.app, this));
   }
 
-  async onunload() {
-    for (const [el, instance] of this.svelteInstances) {
-      unmount(instance);
+  onunload() {
+    for (const [, instance] of this.svelteInstances) {
+      void unmount(instance);
     }
     this.svelteInstances.clear();
   }
@@ -41,9 +41,9 @@ export default class ChronostraPlugin extends Plugin {
     let flatItems: FlatItem[];
     try {
       flatItems = JSON.parse(source);
-    } catch (e) {
+    } catch {
       el.createEl('div', {
-        text: 'Chronostra: Invalid JSON in future-data block',
+        text: 'Chronostra: invalid JSON in future-data block',
         cls: 'chronostra-error',
       });
       return;
@@ -58,13 +58,13 @@ export default class ChronostraPlugin extends Plugin {
         if (ancestor.classList.contains('markdown-preview-sizer') ||
             ancestor.classList.contains('cm-sizer') ||
             ancestor.classList.contains('markdown-source-view')) {
-          ancestor.style.maxWidth = 'none';
+          ancestor.addClass('chronostra-full-width');
           break;
         }
         const computed = getComputedStyle(ancestor);
         const mw = parseInt(computed.maxWidth);
         if (mw > 0 && mw < 2000) {
-          ancestor.style.maxWidth = 'none';
+          ancestor.addClass('chronostra-full-width');
         }
         ancestor = ancestor.parentElement;
       }
@@ -79,10 +79,10 @@ export default class ChronostraPlugin extends Plugin {
         initialExpandedIds: this.settings.expandedIds,
         onExpandChange: (expandedIds: string[]) => {
           this.settings.expandedIds = expandedIds;
-          this.saveSettings();
+          void this.saveSettings();
         },
         onDataChange: (updatedData: ChronoData) => {
-          this.saveDataToFile(updatedData, ctx.sourcePath);
+          void this.saveDataToFile(updatedData, ctx.sourcePath);
         },
       },
     });
@@ -91,7 +91,7 @@ export default class ChronostraPlugin extends Plugin {
 
     const observer = new MutationObserver(() => {
       if (!el.isConnected) {
-        unmount(instance);
+        void unmount(instance);
         this.svelteInstances.delete(el);
         observer.disconnect();
       }
@@ -107,7 +107,7 @@ export default class ChronostraPlugin extends Plugin {
     const flatItems = flattenTreeToItems(data);
     const newJson = JSON.stringify(flatItems, null, 2);
 
-    await this.app.vault.process(file as any, (content: string) => {
+    await this.app.vault.process(file, (content: string) => {
       const regex = /```future-data\s*\n[\s\S]*?\n```/;
       return content.replace(regex, '```future-data\n' + newJson + '\n```');
     });

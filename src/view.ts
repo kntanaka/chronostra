@@ -51,9 +51,9 @@ export class ChronostraView extends ItemView {
     );
   }
 
-  async onClose() {
+  onClose() {
     if (this.svelteComponent) {
-      unmount(this.svelteComponent);
+      void unmount(this.svelteComponent);
       this.svelteComponent = null;
     }
   }
@@ -66,7 +66,7 @@ export class ChronostraView extends ItemView {
         initialExpandedIds: this.plugin.settings.expandedIds,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;
-          this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         },
       },
     });
@@ -75,7 +75,7 @@ export class ChronostraView extends ItemView {
   private remount() {
     const container = this.containerEl.children[1] as HTMLElement;
     if (this.svelteComponent) {
-      unmount(this.svelteComponent);
+      void unmount(this.svelteComponent);
       this.svelteComponent = null;
     }
     container.empty();
