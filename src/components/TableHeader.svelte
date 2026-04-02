@@ -1,15 +1,17 @@
 <script lang="ts">
-  const TIMELINE_START = 2025;
-  const TIMELINE_END = 2050;
-  const years = Array.from({ length: TIMELINE_END - TIMELINE_START + 1 }, (_, i) => TIMELINE_START + i);
+  import type { TimelineDisplay } from '../settings';
 
-  const metricLabels = ['Future', 'Now', 'Gap'];
+  const metricLabels = ['Future', 'Now', 'Gap', 'Status'];
 
   let {
     hierarchyWidth,
     metricWidths,
     metricFrozen,
     focusYear,
+    timelineDisplay = 'year' as TimelineDisplay,
+    birthYear = null as number | null,
+    timelineStartYear,
+    timelineEndYear,
     onhierarchyresize,
     onresize,
     ontogglefreeze,
@@ -19,11 +21,38 @@
     metricWidths: number[];
     metricFrozen: boolean[];
     focusYear: number | null;
+    timelineDisplay?: TimelineDisplay;
+    birthYear?: number | null;
+    timelineStartYear: number;
+    timelineEndYear: number;
     onhierarchyresize: (width: number) => void;
     onresize: (index: number, width: number) => void;
     ontogglefreeze: (index: number) => void;
     onfocusyear: (year: number | null) => void;
   } = $props();
+
+  const years = $derived.by(() => {
+    const start = Math.min(timelineStartYear, timelineEndYear);
+    const end = Math.max(timelineStartYear, timelineEndYear);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  });
+
+  // Milestone ages for life markers
+  const MILESTONE_AGES = new Set([20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
+
+  function yearLabel(year: number): string {
+    if (birthYear != null) {
+      const age = year - birthYear;
+      if (timelineDisplay === 'age') return String(age);
+      if (timelineDisplay === 'both') return `${year}(${age})`;
+    }
+    return String(year);
+  }
+
+  function isMilestone(year: number): boolean {
+    if (birthYear == null) return false;
+    return MILESTONE_AGES.has(year - birthYear);
+  }
 
   // Compute sticky left offsets — only for frozen columns, and only if all preceding columns are also frozen
   const stickyOffsets = $derived(
@@ -129,8 +158,9 @@
     <div
       class="header-cell timeline-header"
       class:year-focused={focusYear === year}
+      class:milestone={isMilestone(year)}
       ondblclick={() => onfocusyear(focusYear === year ? null : year)}
-    >{year}</div>
+    >{yearLabel(year)}</div>
   {/each}
 </div>
 
@@ -195,6 +225,11 @@
     color: var(--text-normal);
     font-weight: 700;
     border-bottom: 2px solid var(--text-normal);
+  }
+  .timeline-header.milestone {
+    color: var(--text-normal);
+    font-weight: 600;
+    border-left: 2px solid var(--interactive-accent);
   }
   .resize-handle {
     position: absolute;

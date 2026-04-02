@@ -27,6 +27,8 @@ export function buildTreeFromFlatItems(items: FlatItem[]): ChronoData {
       level,
       depth,
       metrics: item.metrics,
+      status: item.status,
+      notePath: item.notePath,
       timeline: item.timeline,
     };
 
@@ -57,6 +59,8 @@ export function flattenTreeToItems(data: ChronoData): FlatItem[] {
         id: node.id,
         path,
         metrics: node.metrics,
+        status: node.status,
+        notePath: node.notePath,
         timeline: node.timeline,
       });
       if (node.children) {

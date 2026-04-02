@@ -1,4 +1,10 @@
-import { Plugin, MarkdownPostProcessorContext, TFile } from 'obsidian';
+import {
+  Plugin,
+  MarkdownPostProcessorContext,
+  TFile,
+  TFolder,
+  normalizePath,
+} from 'obsidian';
 import { mount, unmount } from 'svelte';
 import ChronoTable from './components/ChronoTable.svelte';
 import {
@@ -77,12 +83,27 @@ export default class ChronostraPlugin extends Plugin {
       props: {
         data,
         initialExpandedIds: this.settings.expandedIds,
+        birthDate: this.settings.birthDate,
+        timelineDisplay: this.settings.timelineDisplay,
+        timelineStartYear: this.settings.timelineStartYear,
+        timelineEndYear: this.settings.timelineEndYear,
+        showRowBorders: this.settings.showRowBorders,
+        sourcePath: ctx.sourcePath,
         onExpandChange: (expandedIds: string[]) => {
           this.settings.expandedIds = expandedIds;
           void this.saveSettings();
         },
         onDataChange: (updatedData: ChronoData) => {
           void this.saveDataToFile(updatedData, ctx.sourcePath);
+        },
+        onEnsureNote: async (payload: {
+          notePath?: string;
+          sourcePath: string;
+          hierarchyPath: string[];
+        }) => this.ensureRowNote(payload),
+        onSettingsChange: (key: string, value: unknown) => {
+          (this.settings as Record<string, unknown>)[key] = value;
+          void this.saveSettings();
         },
       },
     });
@@ -119,5 +140,65 @@ export default class ChronostraPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  async ensureRowNote(payload: {
+    notePath?: string;
+    sourcePath: string;
+    hierarchyPath: string[];
+  }): Promise<string | null> {
+    const resolvedPath = normalizePath(
+      payload.notePath?.trim() || this.buildDefaultNotePath(payload.sourcePath, payload.hierarchyPath)
+    );
+
+    await this.ensureFolderForPath(resolvedPath);
+
+    let file = this.app.vault.getAbstractFileByPath(resolvedPath);
+    if (!(file instanceof TFile)) {
+      const heading = payload.hierarchyPath.join(' > ');
+      file = await this.app.vault.create(
+        resolvedPath,
+        `# ${payload.hierarchyPath[payload.hierarchyPath.length - 1]}\n\nLinked from Chronostra.\n\n- Path: ${heading}\n`
+      );
+    }
+
+    await this.app.workspace.getLeaf(true).openFile(file);
+    return file.path;
+  }
+
+  private buildDefaultNotePath(sourcePath: string, hierarchyPath: string[]): string {
+    const segments = sourcePath.split('/');
+    segments.pop();
+    const folder = normalizePath(
+      [...segments, 'Chronostra Notes'].filter(Boolean).join('/')
+    );
+    const basename = hierarchyPath
+      .map((segment) => this.slugifySegment(segment))
+      .join(' - ');
+    return normalizePath(`${folder}/${basename || 'Untitled'}.md`);
+  }
+
+  private slugifySegment(segment: string): string {
+    return segment
+      .replace(/[\\/:*?"<>|#^[\]]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private async ensureFolderForPath(filePath: string): Promise<void> {
+    const parts = filePath.split('/');
+    parts.pop();
+
+    let current = '';
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      const normalized = normalizePath(current);
+      const existing = this.app.vault.getAbstractFileByPath(normalized);
+      if (!existing) {
+        await this.app.vault.createFolder(normalized);
+      } else if (!(existing instanceof TFolder)) {
+        throw new Error(`Chronostra: ${normalized} exists and is not a folder`);
+      }
+    }
   }
 }

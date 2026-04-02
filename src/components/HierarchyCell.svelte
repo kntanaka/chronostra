@@ -2,7 +2,7 @@
   import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
-  let { row, width, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart }: {
+  let { row, width, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onnoteclick }: {
     row: FlatRow;
     width: number;
     autoEdit?: boolean;
@@ -11,7 +11,27 @@
     onlabelchange?: (id: string, newLabel: string) => void;
     onautoedited?: () => void;
     ondragstart?: (e: PointerEvent) => void;
+    onnoteclick?: () => void;
   } = $props();
+
+  const summaryText = $derived.by(() => {
+    if (!row.summary || !row.hasChildren) return '';
+
+    const descendants = Math.max(row.summary.subtreeCount - 1, 0);
+    const parts: string[] = [`${descendants} items`];
+
+    if (row.summary.statusCounts['in-progress'] > 0) {
+      parts.push(`${row.summary.statusCounts['in-progress']} wip`);
+    }
+    if (row.summary.statusCounts.done > 0) {
+      parts.push(`${row.summary.statusCounts.done} done`);
+    }
+    if (row.summary.linkedNotes > 0) {
+      parts.push(`${row.summary.linkedNotes} notes`);
+    }
+
+    return parts.join(' · ');
+  });
 
   let editing = $state(false);
   let editValue = $state('');
@@ -23,13 +43,6 @@
       onautoedited?.();
     }
   });
-
-  const levelLabels = {
-    category: 'CAT',
-    goal: 'GOAL',
-    project: 'PROJ',
-    task: 'TASK'
-  };
 
   function startEdit() {
     if (!onlabelchange) return;
@@ -81,25 +94,43 @@
     <span class="toggle-spacer"></span>
   {/if}
 
-  <span class="level-badge level-{row.level}">{levelLabels[row.level]}</span>
-
-  {#if editing}
-    <input
-      class="label-input"
-      type="text"
-      bind:value={editValue}
-      onblur={commitEdit}
-      onkeydown={handleKeydown}
-      autofocus
-    />
-  {:else}
-    <span
-      class="label"
-      class:editable={!!onlabelchange}
-      title={row.label}
-      ondblclick={startEdit}
-    >{row.label}</span>
-  {/if}
+  <div class="label-stack">
+    {#if editing}
+      <input
+        class="label-input"
+        type="text"
+        bind:value={editValue}
+        onblur={commitEdit}
+        onkeydown={handleKeydown}
+        autofocus
+      />
+    {:else}
+      <div class="label-line">
+        <span
+          class="label"
+          class:editable={!!onlabelchange}
+          title={row.label}
+          ondblclick={startEdit}
+        >{row.label}</span>
+        {#if onnoteclick}
+          <button
+            class="note-link"
+            class:is-linked={!!row.notePath}
+            title={row.notePath ? row.notePath : 'Create note'}
+            onclick={(e) => {
+              e.stopPropagation();
+              onnoteclick();
+            }}
+          >
+            {row.notePath ? 'note' : '+note'}
+          </button>
+        {/if}
+      </div>
+      {#if summaryText}
+        <div class="summary" title={summaryText}>{summaryText}</div>
+      {/if}
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -107,9 +138,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    height: var(--chronostra-row-height);
+    min-height: var(--chronostra-row-height);
     overflow: hidden;
-    white-space: nowrap;
     box-sizing: border-box;
     background: inherit;
     position: relative;
@@ -148,32 +178,25 @@
     width: 20px;
     flex-shrink: 0;
   }
-  .level-badge {
-    font-size: 9px;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    padding: 0;
-    flex-shrink: 0;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-  .level-badge.level-category {
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-  .level-badge.level-goal {
-    color: var(--text-faint);
-  }
-  .level-badge.level-project {
-    color: var(--text-faint);
-  }
-  .level-badge.level-task {
-    color: var(--text-faint);
-    font-size: 8px;
-  }
   .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-width: 0;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+  .label-stack {
+    min-width: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    padding: 5px 0;
+  }
+  .label-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
   }
   .label.editable {
@@ -183,6 +206,40 @@
     text-decoration: underline;
     text-decoration-style: dotted;
     text-underline-offset: 2px;
+  }
+  .note-link {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0;
+    text-decoration: underline;
+    box-shadow: none;
+  }
+  .note-link.is-linked {
+    color: var(--interactive-accent);
+  }
+  .note-link:hover {
+    color: var(--text-normal);
+  }
+  .summary {
+    min-width: 0;
+    font-size: 9px;
+    line-height: 1.35;
+    color: var(--text-faint);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .label-input {
     flex: 1;

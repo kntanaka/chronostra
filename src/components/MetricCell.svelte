@@ -69,7 +69,7 @@
   .metric-cell {
     display: flex;
     align-items: center;
-    height: var(--chronostra-row-height);
+    min-height: var(--chronostra-row-height);
     padding: 0 8px;
     font-size: 11px;
     background: inherit;
@@ -83,9 +83,9 @@
     background: var(--background-secondary) !important;
   }
   .metric-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.4;
   }
   .metric-cell.editing {
     padding: 0 4px;

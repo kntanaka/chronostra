@@ -31,6 +31,13 @@ export class TreeState {
     this.expanded = new Set(ids);
   }
 
+  expand(id: string) {
+    if (this.expanded.has(id)) return;
+    const next = new Set(this.expanded);
+    next.add(id);
+    this.expanded = next;
+  }
+
   collapseAll() {
     this.expanded = new Set();
   }

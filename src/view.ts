@@ -64,8 +64,23 @@ export class ChronostraView extends ItemView {
       props: {
         data: this.data,
         initialExpandedIds: this.plugin.settings.expandedIds,
+        birthDate: this.plugin.settings.birthDate,
+        timelineDisplay: this.plugin.settings.timelineDisplay,
+        timelineStartYear: this.plugin.settings.timelineStartYear,
+        timelineEndYear: this.plugin.settings.timelineEndYear,
+        showRowBorders: this.plugin.settings.showRowBorders,
+        sourcePath: this.plugin.settings.targetFilePath,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;
+          void this.plugin.saveSettings();
+        },
+        onEnsureNote: async (payload: {
+          notePath?: string;
+          sourcePath: string;
+          hierarchyPath: string[];
+        }) => this.plugin.ensureRowNote(payload),
+        onSettingsChange: (key: string, value: unknown) => {
+          (this.plugin.settings as Record<string, unknown>)[key] = value;
           void this.plugin.saveSettings();
         },
       },

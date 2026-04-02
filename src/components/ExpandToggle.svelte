@@ -21,23 +21,26 @@
 
 <style>
   .expand-toggle {
+    appearance: none;
+    -webkit-appearance: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 20px;
     height: 20px;
     border: none;
+    outline: none;
     background: transparent;
     color: var(--text-faint);
     cursor: pointer;
     padding: 0;
-    border-radius: 3px;
-    transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+    border-radius: 0;
+    box-shadow: none;
+    transition: transform 0.15s ease, color 0.15s ease;
     flex-shrink: 0;
   }
   .expand-toggle:hover {
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.05);
   }
   .expand-toggle.expanded {
     transform: rotate(90deg);
