@@ -122,7 +122,7 @@
               onnoteclick();
             }}
           >
-            {row.notePath ? 'note' : '+note'}
+            {row.notePath ? 'note' : '+'}
           </button>
         {/if}
       </div>
@@ -213,22 +213,29 @@
     font-family: inherit;
     flex-shrink: 0;
     border: none;
-    border-radius: 0;
+    border-radius: 3px;
     background: transparent;
-    color: var(--text-faint);
+    color: transparent;
     cursor: pointer;
-    font-size: 9px;
+    font-size: 11px;
+    line-height: 1;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 0;
+    padding: 4px 6px;
+    margin: -4px 0;
     text-decoration: underline;
     box-shadow: none;
+    transition: color 0.1s, background 0.1s;
+  }
+  .hierarchy-cell:hover .note-link {
+    color: var(--text-faint);
   }
   .note-link.is-linked {
     color: var(--interactive-accent);
   }
   .note-link:hover {
-    color: var(--text-normal);
+    color: var(--text-normal) !important;
+    background: var(--background-modifier-hover, var(--background-secondary));
   }
   .summary {
     min-width: 0;
