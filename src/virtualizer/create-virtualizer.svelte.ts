@@ -3,45 +3,69 @@ import {
   elementScroll,
   observeElementOffset,
   observeElementRect,
-  type VirtualizerOptions
+  type VirtualizerOptions,
+  type VirtualItem
 } from '@tanstack/virtual-core';
 
 export function createVirtualizer<
   TScrollElement extends Element,
   TItemElement extends Element = Element
 >(optionsFn: () => Partial<VirtualizerOptions<TScrollElement, TItemElement>>) {
-  let instance = $state<Virtualizer<TScrollElement, TItemElement>>();
+  let virtualItems = $state<VirtualItem[]>([]);
+  let totalSize = $state(0);
+  let virt: Virtualizer<TScrollElement, TItemElement> | undefined;
 
-  $effect(() => {
-    const opts = optionsFn();
-    const v = new Virtualizer<TScrollElement, TItemElement>({
+  function syncState() {
+    if (!virt) return;
+    virtualItems = virt.getVirtualItems();
+    totalSize = virt.getTotalSize();
+  }
+
+  function resolveOptions(
+    opts: Partial<VirtualizerOptions<TScrollElement, TItemElement>>
+  ): VirtualizerOptions<TScrollElement, TItemElement> {
+    return {
       observeElementRect,
       observeElementOffset,
       scrollToFn: elementScroll,
       ...opts,
-      onChange: (updatedInstance, sync) => {
+      onChange: (_inst: Virtualizer<TScrollElement, TItemElement>, sync: boolean) => {
         if (sync) {
-          instance = updatedInstance;
+          syncState();
         } else {
-          queueMicrotask(() => {
-            instance = updatedInstance;
-          });
+          queueMicrotask(syncState);
         }
-        opts.onChange?.(updatedInstance, sync);
+        opts.onChange?.(_inst, sync);
       }
-    } as VirtualizerOptions<TScrollElement, TItemElement>);
+    } as VirtualizerOptions<TScrollElement, TItemElement>;
+  }
 
-    v._willUpdate();
-    instance = v;
+  $effect.pre(() => {
+    const opts = resolveOptions(optionsFn());
 
-    return () => {
-      v._willUpdate();
-    };
+    if (!virt) {
+      virt = new Virtualizer(opts);
+    } else {
+      virt.setOptions(opts);
+    }
+
+    virt._willUpdate();
+    syncState();
+  });
+
+  $effect(() => {
+    return virt?._didMount();
   });
 
   return {
     get instance() {
-      return instance;
+      return virt;
+    },
+    get virtualItems() {
+      return virtualItems;
+    },
+    get totalSize() {
+      return totalSize;
     }
   };
 }
