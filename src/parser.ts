@@ -1,6 +1,4 @@
-import type { FlatItem, TreeNode, ChronoData, HierarchyLevel } from './types';
-
-const LEVEL_MAP: HierarchyLevel[] = ['category', 'goal', 'project', 'task'];
+import type { FlatItem, TreeNode, ChronoData } from './types';
 
 /** Build tree from flat items sorted by path */
 export function buildTreeFromFlatItems(items: FlatItem[]): ChronoData {
@@ -18,14 +16,14 @@ export function buildTreeFromFlatItems(items: FlatItem[]): ChronoData {
 
   for (const item of sorted) {
     const depth = item.path.length - 1;
-    const level = LEVEL_MAP[Math.min(depth, LEVEL_MAP.length - 1)];
     const label = item.path[item.path.length - 1];
 
     const node: TreeNode = {
       id: item.id,
       label,
-      level,
       depth,
+      scope: item.scope,
+      commitment: item.commitment,
       metrics: item.metrics,
       status: item.status,
       notePath: item.notePath,
@@ -58,6 +56,8 @@ export function flattenTreeToItems(data: ChronoData): FlatItem[] {
       items.push({
         id: node.id,
         path,
+        scope: node.scope,
+        commitment: node.commitment,
         metrics: node.metrics,
         status: node.status,
         notePath: node.notePath,

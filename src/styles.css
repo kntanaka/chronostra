@@ -3,11 +3,11 @@
 }
 
 .chronostra-container {
-  /* Hierarchy — monochrome, differentiated by opacity */
+  /* Scope — monochrome, differentiated by weight & size */
   --chronostra-bg-category: var(--background-primary);
+  --chronostra-bg-vision: var(--background-primary);
   --chronostra-bg-goal: var(--background-primary);
-  --chronostra-bg-project: var(--background-primary);
-  --chronostra-bg-task: var(--background-primary);
+  --chronostra-bg-step: var(--background-primary);
 
   /* Semantic — muted, functional */
   --chronostra-gap-positive: var(--text-muted);
@@ -37,4 +37,20 @@
   padding: 12px;
   color: var(--text-error);
   font-size: 12px;
+}
+
+/* Scope-driven visual hierarchy.
+   Category and Vision sit at the top; Step recedes into supporting detail. */
+.table-row.kind-category .label,
+.table-row.kind-vision .label {
+  font-size: 13px;
+}
+
+.table-row.kind-goal .label {
+  font-size: 12px;
+}
+
+.table-row.kind-step .label {
+  font-size: 11px;
+  color: var(--text-muted);
 }

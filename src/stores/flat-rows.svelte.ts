@@ -51,8 +51,9 @@ export function flattenTree(
     rows.push({
       id: node.id,
       label: node.label,
-      level: node.level,
       depth: node.depth,
+      scope: node.scope,
+      commitment: node.commitment,
       metrics: node.metrics,
       status: node.status,
       notePath: node.notePath,

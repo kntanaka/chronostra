@@ -1,11 +1,15 @@
 <script lang="ts">
   import type { FlatRow, ItemStatus } from '../types';
+  import { effectiveScope } from '../types';
   import HierarchyCell from './HierarchyCell.svelte';
   import MetricCell from './MetricCell.svelte';
   import StatusCell from './StatusCell.svelte';
+  import CommitmentCell from './CommitmentCell.svelte';
   import TimelineCell from './TimelineCell.svelte';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, autoEdit, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick }: {
+  import type { Commitment } from '../types';
+
+  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, autoEdit, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
@@ -29,21 +33,28 @@
     onautoedited?: () => void;
     ondragstart?: (e: PointerEvent, rowId: string) => void;
     onnoteclick?: (id: string) => void;
+    oncommitmentchange?: (id: string, next: Commitment | undefined) => void;
   } = $props();
 
-  const bgMap = {
+  type DisplayKind = 'category' | 'vision' | 'goal' | 'step';
+
+  const bgMap: Record<DisplayKind, string> = {
     category: 'var(--chronostra-bg-category)',
+    vision: 'var(--chronostra-bg-vision)',
     goal: 'var(--chronostra-bg-goal)',
-    project: 'var(--chronostra-bg-project)',
-    task: 'var(--chronostra-bg-task)'
+    step: 'var(--chronostra-bg-step)'
   };
 
-  const fontWeightMap = {
+  const fontWeightMap: Record<DisplayKind, string> = {
     category: '700',
-    goal: '600',
-    project: '500',
-    task: '400'
+    vision: '600',
+    goal: '500',
+    step: '400'
   };
+
+  const displayKind = $derived<DisplayKind>(
+    row.depth === 0 ? 'category' : (effectiveScope(row.depth, row.scope) ?? 'goal')
+  );
 
   const years = $derived.by(() => {
     const start = Math.min(timelineStartYear, timelineEndYear);
@@ -60,6 +71,7 @@
 
   const metricTypes = ['future', 'now', 'gap'] as const;
   const STATUS_COL_INDEX = 3;
+  const FOCUS_COL_INDEX = 4;
 
   const frozenFlags = $derived(
     metricWidths.map((_: number, i: number) => {
@@ -76,11 +88,8 @@
     })
   );
 
-  // Status column sticky offset
-  const statusStickyOffset = $derived(
-    frozenFlags[STATUS_COL_INDEX]
-      ? hierarchyWidth + metricWidths.slice(0, STATUS_COL_INDEX).reduce((s: number, w: number) => s + w, 0)
-      : null
+  const commitmentMissingDeadline = $derived(
+    row.commitment === 'must' && row.timeline.filter((entry) => entry.text.trim()).length === 0
   );
 
   function handleContextMenu(e: MouseEvent) {
@@ -89,14 +98,14 @@
 </script>
 
 <div
-  class="table-row"
+  class="table-row kind-{displayKind}"
   class:dragged={isDragged}
   class:drop-before={isDropTarget && dropPosition === 'before'}
   class:drop-after={isDropTarget && dropPosition === 'after'}
   class:drop-inside={isDropTarget && dropPosition === 'inside'}
   class:just-dropped={justDropped}
-  style:background={bgMap[row.level]}
-  style:font-weight={fontWeightMap[row.level]}
+  style:background={bgMap[displayKind]}
+  style:font-weight={fontWeightMap[displayKind]}
   oncontextmenu={handleContextMenu}
 >
   <div
@@ -105,7 +114,7 @@
     style:left="0px"
     style:min-width="{hierarchyWidth}px"
     style:max-width="{hierarchyWidth}px"
-    style:background={bgMap[row.level]}
+    style:background={bgMap[displayKind]}
   >
     <HierarchyCell
       {row}
@@ -128,7 +137,7 @@
       class:frozen={isFrozen}
       style:position={isFrozen ? 'sticky' : 'relative'}
       style:left={offset != null ? `${offset}px` : 'auto'}
-      style:background={bgMap[row.level]}
+      style:background={bgMap[displayKind]}
       style:min-width="{metricWidths[i]}px"
       style:max-width="{metricWidths[i]}px"
     >
@@ -145,8 +154,8 @@
     class="metric-col"
     class:frozen={frozenFlags[STATUS_COL_INDEX]}
     style:position={frozenFlags[STATUS_COL_INDEX] ? 'sticky' : 'relative'}
-    style:left={statusStickyOffset != null ? `${statusStickyOffset}px` : 'auto'}
-    style:background={bgMap[row.level]}
+    style:left={stickyOffsets[STATUS_COL_INDEX] != null ? `${stickyOffsets[STATUS_COL_INDEX]}px` : 'auto'}
+    style:background={bgMap[displayKind]}
     style:min-width="{metricWidths[STATUS_COL_INDEX]}px"
     style:max-width="{metricWidths[STATUS_COL_INDEX]}px"
   >
@@ -154,6 +163,24 @@
       value={row.status}
       width={metricWidths[STATUS_COL_INDEX]}
       onchange={onstatuschange ? (v) => onstatuschange(row.id, v) : undefined}
+    />
+  </div>
+
+  <div
+    class="metric-col"
+    class:frozen={frozenFlags[FOCUS_COL_INDEX]}
+    style:position={frozenFlags[FOCUS_COL_INDEX] ? 'sticky' : 'relative'}
+    style:left={stickyOffsets[FOCUS_COL_INDEX] != null ? `${stickyOffsets[FOCUS_COL_INDEX]}px` : 'auto'}
+    style:background={bgMap[displayKind]}
+    style:min-width="{metricWidths[FOCUS_COL_INDEX]}px"
+    style:max-width="{metricWidths[FOCUS_COL_INDEX]}px"
+  >
+    <CommitmentCell
+      value={row.commitment}
+      width={metricWidths[FOCUS_COL_INDEX]}
+      empty={row.depth === 0}
+      needsDeadline={commitmentMissingDeadline}
+      onchange={oncommitmentchange ? (next) => oncommitmentchange(row.id, next) : undefined}
     />
   </div>
 

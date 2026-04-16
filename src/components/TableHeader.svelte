@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TimelineDisplay } from '../settings';
 
-  const metricLabels = ['Future', 'Now', 'Gap', 'Status'];
+  const metricLabels = ['Future', 'Now', 'Gap', 'Status', 'Focus'];
 
   let {
     hierarchyWidth,

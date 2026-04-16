@@ -1,8 +1,30 @@
-export type HierarchyLevel = 'category' | 'goal' | 'project' | 'task';
+/** Maximum tree depth: Category (0) → Vision/Goal/Step layers (1-3). */
+export const MAX_DEPTH = 3;
+
+export type Scope = 'vision' | 'goal' | 'step';
+
+export type Commitment = 'must' | 'wish';
 
 export type TimelineStatus = 'planned' | 'active' | 'completed' | 'at-risk';
 
 export type ItemStatus = 'todo' | 'in-progress' | 'done';
+
+/** Default scope for a given tree depth when the item omits an explicit scope.
+ *  depth 0 is Category (no scope). */
+export function defaultScopeForDepth(depth: number): Scope | undefined {
+  if (depth <= 0) return undefined;
+  if (depth === 1) return 'vision';
+  if (depth === 2) return 'goal';
+  return 'step';
+}
+
+/** Resolve the effective scope of a node: explicit if set, otherwise depth-based default. */
+export function effectiveScope(
+  depth: number,
+  explicit?: Scope
+): Scope | undefined {
+  return explicit ?? defaultScopeForDepth(depth);
+}
 
 export interface StatusCounts {
   todo: number;
@@ -33,8 +55,9 @@ export interface Metrics {
 export interface TreeNode {
   id: string;
   label: string;
-  level: HierarchyLevel;
   depth: number;
+  scope?: Scope;
+  commitment?: Commitment;
   metrics: Metrics;
   status?: ItemStatus;
   notePath?: string;
@@ -45,8 +68,9 @@ export interface TreeNode {
 export interface FlatRow {
   id: string;
   label: string;
-  level: HierarchyLevel;
   depth: number;
+  scope?: Scope;
+  commitment?: Commitment;
   metrics: Metrics;
   status?: ItemStatus;
   notePath?: string;
@@ -66,6 +90,8 @@ export interface ChronoData {
 export interface FlatItem {
   id: string;
   path: string[];
+  scope?: Scope;
+  commitment?: Commitment;
   metrics: Metrics;
   status?: ItemStatus;
   notePath?: string;

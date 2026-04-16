@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { ChronoData, TreeNode, ItemStatus, FlatRow, HierarchyLevel } from '../types';
+  import type { ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
+  import { effectiveScope, MAX_DEPTH } from '../types';
   import type { TimelineDisplay } from '../settings';
   import { TreeState } from '../stores/tree-state.svelte';
   import { flattenTree } from '../stores/flat-rows.svelte';
@@ -8,7 +9,8 @@
   import CellPopup from './CellPopup.svelte';
 
   type StatusFilter = 'all' | ItemStatus;
-  type LevelFilter = 'all' | HierarchyLevel;
+  type ScopeFilter = 'all' | 'category' | Scope;
+  type CommitmentFilter = 'all' | Commitment;
   type NoteFilter = 'all' | 'linked' | 'unlinked';
   type RowMenuState = { id: string; x: number; y: number } | null;
 
@@ -26,7 +28,6 @@
   const ROW_HEIGHT = 36;
   const HISTORY_LIMIT = 50;
   const DISPLAY_CYCLE: TimelineDisplay[] = ['year', 'age', 'both'];
-  const LEVEL_ORDER: HierarchyLevel[] = ['category', 'goal', 'project', 'task'];
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
 
   const ROOT_TEMPLATES: RootTemplate[] = [
@@ -47,11 +48,11 @@
       label: 'Goal Stack',
       nodes: [
         {
-          label: 'Flagship Goal',
+          label: 'Flagship Vision',
           children: [
             {
-              label: 'Primary Project',
-              children: [{ label: 'Next Task' }],
+              label: 'Supporting Goal',
+              children: [{ label: 'Next Step' }],
             },
           ],
         },
@@ -64,9 +65,9 @@
         {
           label: 'Year Vision',
           children: [
-            { label: 'Theme' },
-            { label: 'Projects' },
-            { label: 'Habits' },
+            { label: 'Theme Goal' },
+            { label: 'Project Step' },
+            { label: 'Habit Step' },
           ],
         },
       ],
@@ -112,7 +113,8 @@
 
   let searchQuery = $state('');
   let statusFilter = $state<StatusFilter>('all');
-  let levelFilter = $state<LevelFilter>('all');
+  let scopeFilter = $state<ScopeFilter>('all');
+  let commitmentFilter = $state<CommitmentFilter>('all');
   let noteFilter = $state<NoteFilter>('all');
   let focusId = $state<string | null>(null);
   let showTemplateMenu = $state(false);
@@ -142,7 +144,8 @@
   const hasActiveFilters = $derived(
     searchQuery.trim().length > 0 ||
       statusFilter !== 'all' ||
-      levelFilter !== 'all' ||
+      scopeFilter !== 'all' ||
+      commitmentFilter !== 'all' ||
       noteFilter !== 'all'
   );
 
@@ -192,7 +195,12 @@
       return false;
     }
 
-    if (levelFilter !== 'all' && row.level !== levelFilter) {
+    if (scopeFilter !== 'all') {
+      const rowKind = row.depth === 0 ? 'category' : (effectiveScope(row.depth, row.scope) ?? 'goal');
+      if (rowKind !== scopeFilter) return false;
+    }
+
+    if (commitmentFilter !== 'all' && row.commitment !== commitmentFilter) {
       return false;
     }
 
@@ -243,8 +251,8 @@
   }
 
   let hierarchyWidth = $state(320);
-  let metricWidths = $state([200, 200, 200, 100]);
-  let metricFrozen = $state([true, true, true, true]);
+  let metricWidths = $state([200, 200, 200, 100, 100]);
+  let metricFrozen = $state([true, true, true, true, true]);
 
   function handleHierarchyResize(width: number) {
     hierarchyWidth = Math.max(150, width);
@@ -471,6 +479,24 @@
     });
   }
 
+  function handleScopeChange(id: string, scope: Scope | undefined) {
+    commitMutation(() => {
+      const node = findNode(data.categories, id);
+      if (!node || node.scope === scope) return false;
+      node.scope = scope;
+      return true;
+    });
+  }
+
+  function handleCommitmentChange(id: string, commitment: Commitment | undefined) {
+    commitMutation(() => {
+      const node = findNode(data.categories, id);
+      if (!node || node.commitment === commitment) return false;
+      node.commitment = commitment;
+      return true;
+    });
+  }
+
   function handleLabelChange(id: string, newLabel: string) {
     commitMutation(() => {
       const node = findNode(data.categories, id);
@@ -488,7 +514,6 @@
     return {
       id: generateId(),
       label,
-      level: LEVEL_ORDER[Math.min(depth, LEVEL_ORDER.length - 1)],
       depth,
       metrics: { future: '', now: '', gap: '' },
       timeline: [],
@@ -509,7 +534,6 @@
     return drafts.map((draft) => ({
       id: generateId(),
       label: draft.label,
-      level: LEVEL_ORDER[Math.min(depth, LEVEL_ORDER.length - 1)],
       depth,
       metrics: { future: '', now: '', gap: '' },
       timeline: [],
@@ -549,7 +573,6 @@
       const sibling = loc.parent[loc.index];
       const next = createNode('New Item', sibling.depth);
       next.id = newId;
-      next.level = sibling.level;
       loc.parent.splice(loc.index + 1, 0, next);
       return true;
     });
@@ -580,18 +603,18 @@
 
   function insertStarterChain(parentId: string) {
     const parent = findNode(data.categories, parentId);
-    if (!parent || parent.depth >= LEVEL_ORDER.length - 1) return;
+    if (!parent || parent.depth >= MAX_DEPTH) return;
 
-    const maxDepth = Math.min(parent.depth + 3, LEVEL_ORDER.length - 1);
+    const maxDepth = Math.min(parent.depth + 3, MAX_DEPTH);
     const drafts: TemplateDraft[] = [
       {
-        label: 'Starter Goal',
+        label: 'Starter Vision',
         children:
           maxDepth >= parent.depth + 2
             ? [
                 {
-                  label: 'Starter Project',
-                  children: maxDepth >= parent.depth + 3 ? [{ label: 'Starter Task' }] : undefined,
+                  label: 'Starter Goal',
+                  children: maxDepth >= parent.depth + 3 ? [{ label: 'Starter Step' }] : undefined,
                 },
               ]
             : undefined,
@@ -851,7 +874,6 @@
 
   function updateDepth(node: TreeNode, delta: number) {
     node.depth += delta;
-    node.level = LEVEL_ORDER[Math.min(Math.max(node.depth, 0), LEVEL_ORDER.length - 1)];
     if (node.children) {
       for (const child of node.children) {
         updateDepth(child, delta);
@@ -881,7 +903,8 @@
   function resetFilters() {
     searchQuery = '';
     statusFilter = 'all';
-    levelFilter = 'all';
+    scopeFilter = 'all';
+    commitmentFilter = 'all';
     noteFilter = 'all';
   }
 </script>
@@ -920,12 +943,17 @@
       <option value="in-progress">WIP</option>
       <option value="done">Done</option>
     </select>
-    <select class="filter-select" bind:value={levelFilter}>
-      <option value="all">All levels</option>
+    <select class="filter-select" bind:value={scopeFilter}>
+      <option value="all">All scopes</option>
       <option value="category">Category</option>
+      <option value="vision">Vision</option>
       <option value="goal">Goal</option>
-      <option value="project">Project</option>
-      <option value="task">Task</option>
+      <option value="step">Step</option>
+    </select>
+    <select class="filter-select" bind:value={commitmentFilter}>
+      <option value="all">All focus</option>
+      <option value="must">Must ★</option>
+      <option value="wish">Wish ☆</option>
     </select>
     <select class="filter-select" bind:value={noteFilter}>
       <option value="all">All notes</option>
@@ -1051,6 +1079,7 @@
             onautoedited={() => { pendingEditId = null; }}
             ondragstart={handleDragStart}
             onnoteclick={handleNoteClick}
+            oncommitmentchange={handleCommitmentChange}
           />
         </div>
       {/each}
@@ -1077,6 +1106,38 @@
         <button class="context-item" onclick={() => { insertStarterChain(rowMenu!.id); closeRowMenu(); }}>
           Insert Starter Chain
         </button>
+        {#if (findNode(data.categories, rowMenu.id)?.depth ?? 0) > 0}
+          {@const menuNode = findNode(data.categories, rowMenu.id)}
+          <div class="context-divider"></div>
+          <div class="context-section-label">Scope</div>
+          <button
+            class="context-item"
+            class:context-item-active={menuNode?.scope === 'vision'}
+            onclick={() => { handleScopeChange(rowMenu!.id, 'vision'); closeRowMenu(); }}
+          >
+            Set as Vision
+          </button>
+          <button
+            class="context-item"
+            class:context-item-active={menuNode?.scope === 'goal'}
+            onclick={() => { handleScopeChange(rowMenu!.id, 'goal'); closeRowMenu(); }}
+          >
+            Set as Goal
+          </button>
+          <button
+            class="context-item"
+            class:context-item-active={menuNode?.scope === 'step'}
+            onclick={() => { handleScopeChange(rowMenu!.id, 'step'); closeRowMenu(); }}
+          >
+            Set as Step
+          </button>
+          {#if menuNode?.scope}
+            <button class="context-item" onclick={() => { handleScopeChange(rowMenu!.id, undefined); closeRowMenu(); }}>
+              Reset Scope (auto)
+            </button>
+          {/if}
+          <div class="context-divider"></div>
+        {/if}
         <button class="context-item" onclick={() => { void handleNoteClick(rowMenu!.id); closeRowMenu(); }}>
           {findNode(data.categories, rowMenu.id)?.notePath ? 'Open Linked Note' : 'Create Linked Note'}
         </button>
@@ -1362,6 +1423,21 @@
   }
   .context-item.danger:hover {
     color: var(--text-normal);
+  }
+  .context-item-active {
+    color: var(--interactive-accent);
+  }
+  .context-divider {
+    height: 1px;
+    background: var(--background-modifier-border);
+    margin: 4px 0;
+  }
+  .context-section-label {
+    padding: 4px 12px 2px;
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
   :global(.chronostra-drag-ghost) {
     position: fixed;
