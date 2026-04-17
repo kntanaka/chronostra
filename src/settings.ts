@@ -11,16 +11,18 @@ export interface ChronostraSettings {
   timelineStartYear: number;
   timelineEndYear: number;
   showRowBorders: boolean;
+  showSummaryMeta: boolean;
 }
 
 export const DEFAULT_SETTINGS: ChronostraSettings = {
-  targetFilePath: 'Future Plan.md',
+  targetFilePath: 'Future plan.md',
   expandedIds: [],
   birthDate: '',
   timelineDisplay: 'year',
   timelineStartYear: 2025,
   timelineEndYear: 2050,
   showRowBorders: true,
+  showSummaryMeta: false,
 };
 
 export class ChronostraSettingTab extends PluginSettingTab {
@@ -68,7 +70,7 @@ export class ChronostraSettingTab extends PluginSettingTab {
         dropdown
           .addOption('year', 'Year')
           .addOption('age', 'Age')
-          .addOption('both', 'Year (Age)')
+          .addOption('both', 'Year (age)')
           .setValue(this.plugin.settings.timelineDisplay)
           .onChange(async (value) => {
             this.plugin.settings.timelineDisplay = value as TimelineDisplay;
@@ -120,6 +122,18 @@ export class ChronostraSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showRowBorders)
           .onChange(async (value) => {
             this.plugin.settings.showRowBorders = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Summary meta')
+      .setDesc('Show summary text like item, WIP, done, and note counts')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showSummaryMeta)
+          .onChange(async (value) => {
+            this.plugin.settings.showSummaryMeta = value;
             await this.plugin.saveSettings();
           })
       );

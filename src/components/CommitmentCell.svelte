@@ -1,5 +1,12 @@
 <script lang="ts">
+  import DropdownSelect from './DropdownSelect.svelte';
   import type { Commitment } from '../types';
+
+  const COMMITMENT_OPTIONS = [
+    { value: '', label: '—' },
+    { value: 'must', label: 'Must ★' },
+    { value: 'wish', label: 'Wish ☆' },
+  ];
 
   let { value, width, empty, needsDeadline, onchange }: {
     value?: Commitment;
@@ -9,9 +16,8 @@
     onchange?: (next: Commitment | undefined) => void;
   } = $props();
 
-  function handleChange(e: Event) {
+  function handleChange(raw: string) {
     if (!onchange) return;
-    const raw = (e.currentTarget as HTMLSelectElement).value;
     const next = raw === '' ? undefined : (raw as Commitment);
     onchange(next);
   }
@@ -30,10 +36,11 @@
   style:max-width="{width}px"
 >
   {#if !empty}
-    <select
-      class="commitment-select"
+    <DropdownSelect
       value={current}
-      onchange={handleChange}
+      options={COMMITMENT_OPTIONS}
+      variant="cell"
+      minWidth={72}
       disabled={!onchange}
       title={
         value === 'must'
@@ -42,11 +49,8 @@
             ? 'Wish — nice to have, no deadline'
             : 'Set focus'
       }
-    >
-      <option value="">—</option>
-      <option value="must">★ Must</option>
-      <option value="wish">☆ Wish</option>
-    </select>
+      onchange={handleChange}
+    />
   {/if}
 </div>
 
@@ -60,46 +64,20 @@
     box-sizing: border-box;
     overflow: hidden;
   }
-  .commitment-select {
-    appearance: none;
-    -webkit-appearance: none;
-    font-family: inherit;
+  :global(.commitment-cell .dropdown-select) {
     width: 100%;
-    height: calc(var(--chronostra-row-height) - 10px);
-    padding: 0 6px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    color: inherit;
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    cursor: pointer;
-    outline: none;
-    box-shadow: none;
   }
-  .commitment-select:hover {
-    border-color: var(--background-modifier-border);
-    background: var(--background-secondary);
-  }
-  .commitment-select:focus {
-    border-color: var(--interactive-accent);
-  }
-  .commitment-select:disabled {
-    cursor: default;
-    opacity: 0.6;
-  }
-  .is-none .commitment-select {
+  .is-none :global(.dropdown-trigger) {
     color: var(--text-faint);
   }
-  .is-must .commitment-select {
+  .is-must :global(.dropdown-trigger) {
     color: var(--interactive-accent);
     font-weight: 600;
   }
-  .is-wish .commitment-select {
+  .is-wish :global(.dropdown-trigger) {
     color: var(--text-muted);
   }
-  .needs-deadline .commitment-select {
+  .needs-deadline :global(.dropdown-trigger) {
     color: var(--text-error, #d33);
   }
 </style>

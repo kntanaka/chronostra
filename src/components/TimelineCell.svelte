@@ -98,8 +98,9 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    min-width: var(--chronostra-col-timeline-w);
-    max-width: var(--chronostra-col-timeline-w);
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: var(--chronostra-row-height);
     padding: 0 6px;
     font-size: 11px;
@@ -121,8 +122,9 @@
   .timeline-cell.editing {
     display: flex;
     align-items: center;
-    min-width: var(--chronostra-col-timeline-w);
-    max-width: var(--chronostra-col-timeline-w);
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: var(--chronostra-row-height);
     padding: 0 2px;
     box-sizing: border-box;

@@ -2,9 +2,10 @@
   import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
-  let { row, width, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onnoteclick }: {
+  let { row, width, showSummaryMeta = false, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onnoteclick }: {
     row: FlatRow;
     width: number;
+    showSummaryMeta?: boolean;
     autoEdit?: boolean;
     isDragging?: boolean;
     ontoggle: (id: string) => void;
@@ -126,7 +127,7 @@
           </button>
         {/if}
       </div>
-      {#if summaryText}
+      {#if showSummaryMeta && summaryText}
         <div class="summary" title={summaryText}>{summaryText}</div>
       {/if}
     {/if}
@@ -220,7 +221,6 @@
     font-size: 11px;
     line-height: 1;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
     padding: 4px 6px;
     margin: -4px 0;
     text-decoration: underline;
@@ -243,7 +243,6 @@
     line-height: 1.35;
     color: var(--text-faint);
     letter-spacing: 0.03em;
-    text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

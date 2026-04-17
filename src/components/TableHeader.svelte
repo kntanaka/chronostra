@@ -129,6 +129,7 @@
     <div
       class="header-cell metric-header"
       class:frozen={offset != null}
+      class:timeline-start-divider={i === 4}
       style:left={offset != null ? `${offset}px` : 'auto'}
       style:position={offset != null ? 'sticky' : 'relative'}
       style:min-width="{metricWidths[i]}px"
@@ -137,7 +138,7 @@
     >
       {label}
       {#if offset == null}
-        <span class="unfreeze-icon" title="Unfrozen">⇔</span>
+        <span class="unfreeze-icon" title="Not frozen">⇔</span>
       {/if}
       <div
         class="resize-handle"
@@ -145,8 +146,11 @@
         onpointerdown={(e) => onPointerDown(e, i)}
       ></div>
       {#if contextMenuIndex === i}
-        <div class="context-menu">
-          <button class="context-item" onclick={handleToggleFreeze}>
+        <div
+          class="context-menu"
+          onpointerdown={(e) => e.stopPropagation()}
+        >
+          <button type="button" class="context-item" onclick={handleToggleFreeze}>
             {metricFrozen[i] ? '☐ Unfreeze column' : '☑ Freeze column'}
           </button>
         </div>
@@ -170,9 +174,6 @@
     display: flex;
     width: max-content;
     min-width: 100%;
-    position: sticky;
-    top: 0;
-    z-index: 10;
     background: var(--background-primary);
     border-bottom: 1px solid var(--text-faint);
   }
@@ -182,7 +183,6 @@
     height: var(--chronostra-row-height);
     font-size: 10px;
     font-weight: 500;
-    text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
     box-sizing: border-box;
@@ -207,6 +207,9 @@
   .metric-header.frozen {
     z-index: 2;
   }
+  .metric-header.timeline-start-divider {
+    box-shadow: inset -1px 0 0 0 var(--chronostra-timeline-divider);
+  }
   .unfreeze-icon {
     font-size: 8px;
     opacity: 0.3;
@@ -229,7 +232,7 @@
   .timeline-header.milestone {
     color: var(--text-normal);
     font-weight: 600;
-    border-left: 2px solid var(--interactive-accent);
+    box-shadow: inset 1px 0 0 0 var(--chronostra-milestone-line);
   }
   .resize-handle {
     position: absolute;

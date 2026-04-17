@@ -15,9 +15,55 @@ import {
 import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
 import type { FlatItem, ChronoData } from './types';
 
+/**
+ * Markdown wraps code blocks in `pre`/`code` with overflow that creates a scrollport.
+ * `position: sticky` is then resolved against that box instead of the note viewport, so the
+ * toolbar stops "short" of the top and rows scroll into the gap. Reset overflow to visible
+ * while our UI is mounted (the JSON is replaced by the table, so no horizontal scroll needed).
+ */
+function fixAncestorsForStickyToolbar(host: HTMLElement): () => void {
+  const snapshots: {
+    el: HTMLElement;
+    overflow: string;
+    overflowX: string;
+    overflowY: string;
+  }[] = [];
+
+  let p: HTMLElement | null = host.parentElement;
+  while (p) {
+    const tag = p.tagName;
+    if (tag === 'PRE' || tag === 'CODE') {
+      snapshots.push({
+        el: p,
+        overflow: p.style.overflow,
+        overflowX: p.style.overflowX,
+        overflowY: p.style.overflowY,
+      });
+      p.style.setProperty('overflow', 'visible', 'important');
+      p.style.setProperty('overflow-x', 'visible', 'important');
+      p.style.setProperty('overflow-y', 'visible', 'important');
+    }
+    p = p.parentElement;
+  }
+
+  return () => {
+    for (const { el, overflow, overflowX, overflowY } of snapshots) {
+      el.style.removeProperty('overflow');
+      el.style.removeProperty('overflow-x');
+      el.style.removeProperty('overflow-y');
+      if (overflow) el.style.overflow = overflow;
+      if (overflowX) el.style.overflowX = overflowX;
+      if (overflowY) el.style.overflowY = overflowY;
+    }
+  };
+}
+
 export default class ChronostraPlugin extends Plugin {
   settings: ChronostraSettings = DEFAULT_SETTINGS;
-  private svelteInstances: Map<HTMLElement, Record<string, unknown>> = new Map();
+  private svelteInstances = new Map<
+    HTMLElement,
+    { instance: Record<string, unknown>; dispose: () => void }
+  >();
 
   async onload() {
     await this.loadSettings();
@@ -33,8 +79,8 @@ export default class ChronostraPlugin extends Plugin {
   }
 
   onunload() {
-    for (const [, instance] of this.svelteInstances) {
-      void unmount(instance);
+    for (const [, { dispose }] of this.svelteInstances) {
+      dispose();
     }
     this.svelteInstances.clear();
   }
@@ -78,6 +124,8 @@ export default class ChronostraPlugin extends Plugin {
 
     const container = el.createDiv({ cls: 'chronostra-container' });
 
+    const restoreStickyAncestors = fixAncestorsForStickyToolbar(container);
+
     const instance = mount(ChronoTable, {
       target: container,
       props: {
@@ -88,6 +136,7 @@ export default class ChronostraPlugin extends Plugin {
         timelineStartYear: this.settings.timelineStartYear,
         timelineEndYear: this.settings.timelineEndYear,
         showRowBorders: this.settings.showRowBorders,
+        showSummaryMeta: this.settings.showSummaryMeta,
         sourcePath: ctx.sourcePath,
         onExpandChange: (expandedIds: string[]) => {
           this.settings.expandedIds = expandedIds;
@@ -108,11 +157,16 @@ export default class ChronostraPlugin extends Plugin {
       },
     });
 
-    this.svelteInstances.set(el, instance);
+    const dispose = () => {
+      restoreStickyAncestors();
+      void unmount(instance);
+    };
+
+    this.svelteInstances.set(el, { instance, dispose });
 
     const observer = new MutationObserver(() => {
       if (!el.isConnected) {
-        void unmount(instance);
+        dispose();
         this.svelteInstances.delete(el);
         observer.disconnect();
       }

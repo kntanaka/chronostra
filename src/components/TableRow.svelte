@@ -9,7 +9,7 @@
 
   import type { Commitment } from '../types';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, autoEdit, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, showSummaryMeta = false, autoEdit, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
@@ -18,6 +18,7 @@
     focusYear?: number | null;
     timelineStartYear: number;
     timelineEndYear: number;
+    showSummaryMeta?: boolean;
     autoEdit?: boolean;
     isDragged?: boolean;
     isDropTarget?: boolean;
@@ -119,6 +120,7 @@
     <HierarchyCell
       {row}
       width={hierarchyWidth}
+      {showSummaryMeta}
       {autoEdit}
       isDragging={isDragged}
       {ontoggle}
@@ -169,6 +171,7 @@
   <div
     class="metric-col"
     class:frozen={frozenFlags[FOCUS_COL_INDEX]}
+    class:timeline-start-divider={true}
     style:position={frozenFlags[FOCUS_COL_INDEX] ? 'sticky' : 'relative'}
     style:left={stickyOffsets[FOCUS_COL_INDEX] != null ? `${stickyOffsets[FOCUS_COL_INDEX]}px` : 'auto'}
     style:background={bgMap[displayKind]}
@@ -198,6 +201,8 @@
     display: flex;
     width: max-content;
     min-width: 100%;
+    position: relative;
+    isolation: isolate;
     border-bottom: 1px solid var(--background-modifier-border);
     transition: background 0.08s ease;
   }
@@ -223,17 +228,33 @@
     flex-shrink: 0;
     transition: background 0.08s ease;
   }
+  .metric-col.timeline-start-divider {
+    box-shadow: inset -1px 0 0 0 var(--chronostra-timeline-divider);
+  }
   .frozen {
     z-index: 2;
   }
   .timeline-wrap {
-    display: contents;
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    min-width: var(--chronostra-col-timeline-w);
+    max-width: var(--chronostra-col-timeline-w);
+    flex-shrink: 0;
   }
   .milestone-col {
-    display: contents;
+    position: relative;
   }
-  .milestone-col :global(.timeline-cell) {
-    border-left: 2px solid var(--interactive-accent);
+  .milestone-col::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--chronostra-milestone-line);
+    pointer-events: none;
+    z-index: 1;
   }
   .table-row.dragged {
     opacity: 0.2;

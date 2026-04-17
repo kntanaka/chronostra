@@ -16,10 +16,10 @@
     z-index: 200;
     max-width: 320px;
     padding: 8px 12px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    background: var(--chronostra-menu-bg, var(--background-primary));
+    border: 1px solid var(--chronostra-menu-border, var(--background-modifier-border));
+    border-radius: 0;
+    box-shadow: var(--chronostra-menu-shadow, 0 4px 16px rgba(0, 0, 0, 0.4));
     color: var(--text-normal);
     font-size: 12px;
     line-height: 1.6;

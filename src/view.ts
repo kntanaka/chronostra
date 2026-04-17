@@ -34,6 +34,7 @@ export class ChronostraView extends ItemView {
   async onOpen() {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
+    container.addClass('chronostra-view-content');
     container.addClass('chronostra-container');
 
     this.data = await this.dataProvider.load();
@@ -69,6 +70,7 @@ export class ChronostraView extends ItemView {
         timelineStartYear: this.plugin.settings.timelineStartYear,
         timelineEndYear: this.plugin.settings.timelineEndYear,
         showRowBorders: this.plugin.settings.showRowBorders,
+        showSummaryMeta: this.plugin.settings.showSummaryMeta,
         sourcePath: this.plugin.settings.targetFilePath,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;
@@ -94,6 +96,7 @@ export class ChronostraView extends ItemView {
       this.svelteComponent = null;
     }
     container.empty();
+    container.addClass('chronostra-view-content');
     container.addClass('chronostra-container');
     this.mountSvelte(container);
   }

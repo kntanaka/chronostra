@@ -7,6 +7,7 @@
   import TableHeader from './TableHeader.svelte';
   import TableRow from './TableRow.svelte';
   import CellPopup from './CellPopup.svelte';
+  import DropdownSelect from './DropdownSelect.svelte';
 
   type StatusFilter = 'all' | ItemStatus;
   type ScopeFilter = 'all' | 'category' | Scope;
@@ -27,13 +28,40 @@
 
   const ROW_HEIGHT = 36;
   const HISTORY_LIMIT = 50;
-  const DISPLAY_CYCLE: TimelineDisplay[] = ['year', 'age', 'both'];
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
+  const STATUS_FILTER_OPTIONS = [
+    { value: 'all', label: 'All status' },
+    { value: 'todo', label: 'To do' },
+    { value: 'in-progress', label: 'In progress' },
+    { value: 'done', label: 'Done' },
+  ];
+  const SCOPE_FILTER_OPTIONS = [
+    { value: 'all', label: 'All scopes' },
+    { value: 'category', label: 'Category' },
+    { value: 'vision', label: 'Vision' },
+    { value: 'goal', label: 'Goal' },
+    { value: 'step', label: 'Step' },
+  ];
+  const COMMITMENT_FILTER_OPTIONS = [
+    { value: 'all', label: 'All focus' },
+    { value: 'must', label: 'Must ★' },
+    { value: 'wish', label: 'Wish ☆' },
+  ];
+  const NOTE_FILTER_OPTIONS = [
+    { value: 'all', label: 'All notes' },
+    { value: 'linked', label: 'Linked note' },
+    { value: 'unlinked', label: 'No note' },
+  ];
+  const TIMELINE_DISPLAY_OPTIONS = [
+    { value: 'year', label: 'Year' },
+    { value: 'age', label: 'Age' },
+    { value: 'both', label: 'Year + age' },
+  ];
 
   const ROOT_TEMPLATES: RootTemplate[] = [
     {
       id: 'life-areas',
-      label: 'Life Areas',
+      label: 'Life areas',
       nodes: [
         { label: 'Health' },
         { label: 'Work' },
@@ -45,14 +73,14 @@
     },
     {
       id: 'goal-stack',
-      label: 'Goal Stack',
+      label: 'Goal stack',
       nodes: [
         {
-          label: 'Flagship Vision',
+          label: 'Flagship vision',
           children: [
             {
-              label: 'Supporting Goal',
-              children: [{ label: 'Next Step' }],
+              label: 'Supporting goal',
+              children: [{ label: 'Next step' }],
             },
           ],
         },
@@ -60,14 +88,14 @@
     },
     {
       id: 'annual-reset',
-      label: 'Annual Reset',
+      label: 'Annual reset',
       nodes: [
         {
-          label: 'Year Vision',
+          label: 'Year vision',
           children: [
-            { label: 'Theme Goal' },
-            { label: 'Project Step' },
-            { label: 'Habit Step' },
+            { label: 'Theme goal' },
+            { label: 'Project step' },
+            { label: 'Habit step' },
           ],
         },
       ],
@@ -82,6 +110,7 @@
     timelineStartYear: initialTimelineStartYear = 2025,
     timelineEndYear: initialTimelineEndYear = 2050,
     showRowBorders: initialShowRowBorders = true,
+    showSummaryMeta = false,
     sourcePath = '',
     onExpandChange,
     onDataChange,
@@ -95,6 +124,7 @@
     timelineStartYear?: number;
     timelineEndYear?: number;
     showRowBorders?: boolean;
+    showSummaryMeta?: boolean;
     sourcePath?: string;
     onExpandChange?: (expandedIds: string[]) => void;
     onDataChange?: (data: ChronoData) => void;
@@ -117,6 +147,7 @@
   let commitmentFilter = $state<CommitmentFilter>('all');
   let noteFilter = $state<NoteFilter>('all');
   let focusId = $state<string | null>(null);
+  let selectedCategoryIds = $state<string[]>([]);
   let showTemplateMenu = $state(false);
 
   // Mutable copy of the data tree
@@ -129,17 +160,38 @@
     treeState.expanded = new Set(initialData.categories.map((c) => c.id));
   }
 
+  const hasCategorySelection = $derived(selectedCategoryIds.length > 0);
+
   const focusedCategories = $derived.by(() => {
-    if (!focusId) return data.categories;
-    const node = findNode(data.categories, focusId);
-    return node ? [node] : data.categories;
+    if (focusId) {
+      const node = findNode(data.categories, focusId);
+      return node ? [node] : data.categories;
+    }
+    if (hasCategorySelection) {
+      return data.categories.filter((category) => selectedCategoryIds.includes(category.id));
+    }
+    return data.categories;
   });
 
   const visibleRows = $derived(flattenTree(focusedCategories, treeState));
   const expandedRows = $derived(flattenTree(focusedCategories, EXPANDED_TREE_STATE));
   const overviewRows = $derived(
-    flattenTree(focusId ? focusedCategories : data.categories, { isExpanded: () => false } as TreeState)
+    flattenTree(data.categories, { isExpanded: () => false } as TreeState)
   );
+
+  const activeOverviewIds = $derived.by(() => {
+    if (hasCategorySelection) {
+      return new Set(selectedCategoryIds);
+    }
+    if (!focusId) {
+      return new Set<string>();
+    }
+
+    const categoryId = findCategoryIdForNode(data.categories, focusId);
+    return categoryId ? new Set([categoryId]) : new Set<string>();
+  });
+
+  const hasOverviewSelection = $derived(activeOverviewIds.size > 0);
 
   const hasActiveFilters = $derived(
     searchQuery.trim().length > 0 ||
@@ -215,11 +267,9 @@
     return true;
   }
 
-  function toggleTimelineDisplay() {
-    const idx = DISPLAY_CYCLE.indexOf(timelineDisplay);
-    const next = DISPLAY_CYCLE[(idx + 1) % DISPLAY_CYCLE.length];
-    timelineDisplay = next;
-    onSettingsChange?.('timelineDisplay', next);
+  function updateTimelineDisplay(next: string) {
+    timelineDisplay = next as TimelineDisplay;
+    onSettingsChange?.('timelineDisplay', timelineDisplay);
   }
 
   function normalizeTimelineRange(start: number, end: number) {
@@ -232,6 +282,7 @@
   }
 
   let wrapperEl: HTMLDivElement | undefined = $state();
+  let headerScrollEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
 
@@ -267,8 +318,25 @@
   }
 
   let focusYear = $state<number | null>(null);
+  let syncingHeaderScroll = false;
+  let syncingBodyScroll = false;
+
   function handleScroll() {
-    // Kept for future use; sticky columns handle freeze natively
+    if (!scrollContainer || !headerScrollEl || syncingBodyScroll) return;
+    syncingHeaderScroll = true;
+    headerScrollEl.scrollLeft = scrollContainer.scrollLeft;
+    queueMicrotask(() => {
+      syncingHeaderScroll = false;
+    });
+  }
+
+  function handleHeaderScroll() {
+    if (!scrollContainer || !headerScrollEl || syncingHeaderScroll) return;
+    syncingBodyScroll = true;
+    scrollContainer.scrollLeft = headerScrollEl.scrollLeft;
+    queueMicrotask(() => {
+      syncingBodyScroll = false;
+    });
   }
 
   let popupText = $state<string | null>(null);
@@ -383,6 +451,26 @@
       }
     }
     return null;
+  }
+
+  function findCategoryIdForNode(nodes: TreeNode[], id: string): string | null {
+    for (const node of nodes) {
+      if (node.id === id) return node.depth === 0 ? node.id : null;
+      if (node.children && containsNode(node.children, id)) {
+        return node.id;
+      }
+    }
+    return null;
+  }
+
+  function containsNode(nodes: TreeNode[], id: string): boolean {
+    for (const node of nodes) {
+      if (node.id === id) return true;
+      if (node.children && containsNode(node.children, id)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function findPathToNode(nodes: TreeNode[], id: string, path: string[] = []): string[] | null {
@@ -524,7 +612,7 @@
     return {
       ...structuredClone(node),
       id: generateId(),
-      label: isRoot ? `${node.label} Copy` : node.label,
+      label: isRoot ? `${node.label} copy` : node.label,
       notePath: undefined,
       children: node.children?.map((child) => cloneNode(child, false)),
     };
@@ -542,7 +630,7 @@
   }
 
   function addCategory() {
-    const newNode = createNode('New Category', 0);
+    const newNode = createNode('New category', 0);
     commitMutation(() => {
       data.categories.push(newNode);
       return true;
@@ -556,7 +644,7 @@
       const node = findNode(data.categories, parentId);
       if (!node) return false;
       if (!node.children) node.children = [];
-      const child = createNode('New Item', node.depth + 1);
+      const child = createNode('New item', node.depth + 1);
       child.id = newId;
       node.children.push(child);
       treeState.expand(parentId);
@@ -571,7 +659,7 @@
       const loc = findParentAndIndex(data.categories, id);
       if (!loc) return false;
       const sibling = loc.parent[loc.index];
-      const next = createNode('New Item', sibling.depth);
+      const next = createNode('New item', sibling.depth);
       next.id = newId;
       loc.parent.splice(loc.index + 1, 0, next);
       return true;
@@ -608,13 +696,13 @@
     const maxDepth = Math.min(parent.depth + 3, MAX_DEPTH);
     const drafts: TemplateDraft[] = [
       {
-        label: 'Starter Vision',
+        label: 'Starter vision',
         children:
           maxDepth >= parent.depth + 2
             ? [
                 {
-                  label: 'Starter Goal',
-                  children: maxDepth >= parent.depth + 3 ? [{ label: 'Starter Step' }] : undefined,
+                  label: 'Starter goal',
+                  children: maxDepth >= parent.depth + 3 ? [{ label: 'Starter step' }] : undefined,
                 },
               ]
             : undefined,
@@ -900,6 +988,11 @@
     rowMenu = null;
   }
 
+  function closeTransientMenus() {
+    closeRowMenu();
+    showTemplateMenu = false;
+  }
+
   function resetFilters() {
     searchQuery = '';
     statusFilter = 'all';
@@ -907,145 +1000,177 @@
     commitmentFilter = 'all';
     noteFilter = 'all';
   }
+
+  function toggleCategorySelection(categoryId: string) {
+    focusId = null;
+    selectedCategoryIds = selectedCategoryIds.includes(categoryId)
+      ? selectedCategoryIds.filter((id) => id !== categoryId)
+      : [...selectedCategoryIds, categoryId];
+    showTemplateMenu = false;
+  }
+
+  function clearFocusSelection() {
+    focusId = null;
+    selectedCategoryIds = [];
+  }
 </script>
 
 <svelte:window
-  onclick={closeRowMenu}
+  onclick={closeTransientMenus}
   onpointermove={(dragPending || dragState) ? handleDragMove : undefined}
   onpointerup={(dragPending || dragState) ? handleDragEnd : undefined}
   onkeydown={handleWindowKeydown}
 />
 
 <div class="chrono-wrapper" class:is-dragging={!!dragState} bind:this={wrapperEl}>
-  <div class="toolbar">
-    <span class="title">Chronostra</span>
-    <span class="row-count">{flatRows.length} rows</span>
-    {#if saveIndicator}
-      <span class="save-indicator">saved</span>
-    {/if}
-    <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>undo</button>
-    <span class="tool-sep">/</span>
-    <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>redo</button>
-    <span class="tool-sep">|</span>
-    <button class="tool-link" onclick={expandAll}>expand</button>
-    <span class="tool-sep">/</span>
-    <button class="tool-link" onclick={collapseAll}>collapse</button>
-    <span class="tool-sep">|</span>
-    <input
-      class="search-input"
-      type="search"
-      placeholder="Search"
-      bind:value={searchQuery}
-    />
-    <select class="filter-select" bind:value={statusFilter}>
-      <option value="all">All status</option>
-      <option value="todo">To do</option>
-      <option value="in-progress">WIP</option>
-      <option value="done">Done</option>
-    </select>
-    <select class="filter-select" bind:value={scopeFilter}>
-      <option value="all">All scopes</option>
-      <option value="category">Category</option>
-      <option value="vision">Vision</option>
-      <option value="goal">Goal</option>
-      <option value="step">Step</option>
-    </select>
-    <select class="filter-select" bind:value={commitmentFilter}>
-      <option value="all">All focus</option>
-      <option value="must">Must ★</option>
-      <option value="wish">Wish ☆</option>
-    </select>
-    <select class="filter-select" bind:value={noteFilter}>
-      <option value="all">All notes</option>
-      <option value="linked">Linked note</option>
-      <option value="unlinked">No note</option>
-    </select>
-    {#if hasActiveFilters}
-      <button class="tool-link" onclick={resetFilters}>clear</button>
+  <div class="sticky-chrome">
+    <div class="toolbar">
+      <span class="title">Chronostra</span>
+      <span class="row-count">{flatRows.length} rows</span>
+      {#if saveIndicator}
+        <span class="save-indicator">Saved</span>
+      {/if}
+      <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
+      <span class="tool-sep">/</span>
+      <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
       <span class="tool-sep">|</span>
-    {/if}
-    <button class="tool-link" onclick={toggleTimelineDisplay}>
-      {timelineDisplay === 'year' ? 'year' : timelineDisplay === 'age' ? 'age' : 'year+age'}
-    </button>
-    <div class="range-control">
-      <span>timeline</span>
+      <button class="tool-link" onclick={expandAll} title="Expand all">⌄</button>
+      <span class="tool-sep">/</span>
+      <button class="tool-link" onclick={collapseAll} title="Collapse all">&gt;</button>
+      <span class="tool-sep">|</span>
       <input
-        class="range-input"
-        type="number"
-        value={timelineStartYear}
-        onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
+        class="search-input"
+        type="search"
+        placeholder="Search"
+        bind:value={searchQuery}
       />
-      <span>to</span>
-      <input
-        class="range-input"
-        type="number"
-        value={timelineEndYear}
-        onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
+      <DropdownSelect
+        value={statusFilter}
+        options={STATUS_FILTER_OPTIONS}
+        minWidth={116}
+        onchange={(next) => { statusFilter = next as StatusFilter; }}
+      />
+      <DropdownSelect
+        value={scopeFilter}
+        options={SCOPE_FILTER_OPTIONS}
+        minWidth={116}
+        onchange={(next) => { scopeFilter = next as ScopeFilter; }}
+      />
+      <DropdownSelect
+        value={commitmentFilter}
+        options={COMMITMENT_FILTER_OPTIONS}
+        minWidth={110}
+        onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
+      />
+      <DropdownSelect
+        value={noteFilter}
+        options={NOTE_FILTER_OPTIONS}
+        minWidth={112}
+        onchange={(next) => { noteFilter = next as NoteFilter; }}
+      />
+      {#if hasActiveFilters}
+        <button class="tool-link" onclick={resetFilters}>Clear</button>
+        <span class="tool-sep">|</span>
+      {/if}
+      <DropdownSelect
+        value={timelineDisplay}
+        options={TIMELINE_DISPLAY_OPTIONS}
+        minWidth={104}
+        onchange={updateTimelineDisplay}
+      />
+      <div class="range-control">
+        <span>Timeline</span>
+        <input
+          class="range-input"
+          type="number"
+          value={timelineStartYear}
+          onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
+        />
+        <span>to</span>
+        <input
+          class="range-input"
+          type="number"
+          value={timelineEndYear}
+          onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
+        />
+      </div>
+      <div class="toolbar-menu-anchor" onpointerdown={(e) => e.stopPropagation()}>
+        <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
+          Templates
+        </button>
+        {#if showTemplateMenu}
+          <div class="chronostra-menu toolbar-menu" onpointerdown={(e) => e.stopPropagation()}>
+            {#each ROOT_TEMPLATES as template}
+              <button
+                type="button"
+                class="chronostra-menu-item"
+                onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
+              >
+                {template.label}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      {#if focusId || hasCategorySelection}
+        <span class="tool-sep">|</span>
+        <button class="tool-link tool-active" onclick={clearFocusSelection}>
+          &larr; All
+        </button>
+      {/if}
+      <button class="add-btn" onclick={addCategory}>+ Add category</button>
+    </div>
+
+    {#if overviewRows.length > 0}
+      <div class="overview-strip">
+        {#each overviewRows as row (row.id)}
+          <button
+            class="overview-card"
+            class:is-focused={activeOverviewIds.has(row.id)}
+            class:is-dimmed={hasOverviewSelection && !activeOverviewIds.has(row.id)}
+            onclick={() => { toggleCategorySelection(row.id); }}
+          >
+            <span class="overview-title">{row.label}</span>
+            {#if showSummaryMeta && row.summary}
+              <span class="overview-meta">
+                {Math.max(row.summary.subtreeCount - 1, 0)} items ·
+                {row.summary.statusCounts['in-progress']} wip ·
+                {row.summary.statusCounts.done} done ·
+                {row.summary.linkedNotes} notes
+              </span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    <div
+      class="header-scroll"
+      bind:this={headerScrollEl}
+      onscroll={handleHeaderScroll}
+    >
+      <TableHeader
+        {hierarchyWidth}
+        {metricWidths}
+        {metricFrozen}
+        {focusYear}
+        {timelineDisplay}
+        {birthYear}
+        {timelineStartYear}
+        {timelineEndYear}
+        onhierarchyresize={handleHierarchyResize}
+        onresize={handleMetricResize}
+        ontogglefreeze={handleToggleFreeze}
+        onfocusyear={(y) => { focusYear = y; }}
       />
     </div>
-    <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
-      templates
-    </button>
-    {#if focusId}
-      <span class="tool-sep">|</span>
-      <button class="tool-link tool-active" onclick={() => { focusId = null; }}>
-        &larr; all
-      </button>
-    {/if}
-    <button class="add-btn" onclick={addCategory}>+ Add Category</button>
   </div>
 
-  {#if showTemplateMenu}
-    <div class="template-menu">
-      {#each ROOT_TEMPLATES as template}
-        <button class="template-item" onclick={() => insertRootTemplate(template.id)}>
-          {template.label}
-        </button>
-      {/each}
-    </div>
-  {/if}
-
-  {#if overviewRows.length > 0}
-    <div class="overview-strip">
-      {#each overviewRows as row (row.id)}
-        <button
-          class="overview-card"
-          class:is-focused={focusId === row.id}
-          onclick={() => {
-            focusId = focusId === row.id ? null : row.id;
-            showTemplateMenu = false;
-          }}
-        >
-          <span class="overview-title">{row.label}</span>
-          {#if row.summary}
-            <span class="overview-meta">
-              {Math.max(row.summary.subtreeCount - 1, 0)} items ·
-              {row.summary.statusCounts['in-progress']} wip ·
-              {row.summary.statusCounts.done} done ·
-              {row.summary.linkedNotes} notes
-            </span>
-          {/if}
-        </button>
-      {/each}
-    </div>
-  {/if}
-
-  <div class="scroll-container" bind:this={scrollContainer} onscroll={handleScroll}>
-    <TableHeader
-      {hierarchyWidth}
-      {metricWidths}
-      {metricFrozen}
-      {focusYear}
-      {timelineDisplay}
-      {birthYear}
-      {timelineStartYear}
-      {timelineEndYear}
-      onhierarchyresize={handleHierarchyResize}
-      onresize={handleMetricResize}
-      ontogglefreeze={handleToggleFreeze}
-      onfocusyear={(y) => { focusYear = y; }}
-    />
-
+  <div
+    class="scroll-container"
+    bind:this={scrollContainer}
+    onscroll={handleScroll}
+  >
     <div
       class="row-list"
       class:no-borders={!showBorders}
@@ -1064,6 +1189,7 @@
             {focusYear}
             {timelineStartYear}
             {timelineEndYear}
+            {showSummaryMeta}
             autoEdit={pendingEditId === row.id}
             isDragged={dragState?.draggedId === row.id}
             isDropTarget={dragState?.targetId === row.id}
@@ -1093,63 +1219,67 @@
         class="row-context-menu"
         style:left="{rowMenu.x}px"
         style:top="{rowMenu.y}px"
+        onpointerdown={(e) => e.stopPropagation()}
       >
-        <button class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
-          + Add Child
+        <button type="button" class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
+          + Add child
         </button>
-        <button class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
-          + Add Sibling
+        <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
+          + Add sibling
         </button>
-        <button class="context-item" onclick={() => { duplicateRow(rowMenu!.id); closeRowMenu(); }}>
-          Duplicate Subtree
+        <button type="button" class="context-item" onclick={() => { duplicateRow(rowMenu!.id); closeRowMenu(); }}>
+          Duplicate subtree
         </button>
-        <button class="context-item" onclick={() => { insertStarterChain(rowMenu!.id); closeRowMenu(); }}>
-          Insert Starter Chain
+        <button type="button" class="context-item" onclick={() => { insertStarterChain(rowMenu!.id); closeRowMenu(); }}>
+          Insert starter chain
         </button>
         {#if (findNode(data.categories, rowMenu.id)?.depth ?? 0) > 0}
           {@const menuNode = findNode(data.categories, rowMenu.id)}
           <div class="context-divider"></div>
           <div class="context-section-label">Scope</div>
           <button
+            type="button"
             class="context-item"
             class:context-item-active={menuNode?.scope === 'vision'}
             onclick={() => { handleScopeChange(rowMenu!.id, 'vision'); closeRowMenu(); }}
           >
-            Set as Vision
+            Set as vision
           </button>
           <button
+            type="button"
             class="context-item"
             class:context-item-active={menuNode?.scope === 'goal'}
             onclick={() => { handleScopeChange(rowMenu!.id, 'goal'); closeRowMenu(); }}
           >
-            Set as Goal
+            Set as goal
           </button>
           <button
+            type="button"
             class="context-item"
             class:context-item-active={menuNode?.scope === 'step'}
             onclick={() => { handleScopeChange(rowMenu!.id, 'step'); closeRowMenu(); }}
           >
-            Set as Step
+            Set as step
           </button>
           {#if menuNode?.scope}
-            <button class="context-item" onclick={() => { handleScopeChange(rowMenu!.id, undefined); closeRowMenu(); }}>
-              Reset Scope (auto)
+            <button type="button" class="context-item" onclick={() => { handleScopeChange(rowMenu!.id, undefined); closeRowMenu(); }}>
+              Reset scope (auto)
             </button>
           {/if}
           <div class="context-divider"></div>
         {/if}
-        <button class="context-item" onclick={() => { void handleNoteClick(rowMenu!.id); closeRowMenu(); }}>
-          {findNode(data.categories, rowMenu.id)?.notePath ? 'Open Linked Note' : 'Create Linked Note'}
+        <button type="button" class="context-item" onclick={() => { void handleNoteClick(rowMenu!.id); closeRowMenu(); }}>
+          {findNode(data.categories, rowMenu.id)?.notePath ? 'Open linked note' : 'Create linked note'}
         </button>
         {#if findNode(data.categories, rowMenu.id)?.notePath}
-          <button class="context-item" onclick={() => { unlinkNote(rowMenu!.id); closeRowMenu(); }}>
-            Remove Note Link
+          <button type="button" class="context-item" onclick={() => { unlinkNote(rowMenu!.id); closeRowMenu(); }}>
+            Remove note link
           </button>
         {/if}
-        <button class="context-item" onclick={() => { focusId = rowMenu!.id; closeRowMenu(); }}>
+        <button type="button" class="context-item" onclick={() => { selectedCategoryIds = []; focusId = rowMenu!.id; closeRowMenu(); }}>
           Focus
         </button>
-        <button class="context-item danger" onclick={() => { deleteRow(rowMenu!.id); closeRowMenu(); }}>
+        <button type="button" class="context-item danger" onclick={() => { deleteRow(rowMenu!.id); closeRowMenu(); }}>
           Delete
         </button>
       </div>
@@ -1165,13 +1295,26 @@
   .chrono-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 100%;
+    height: fit-content;
     background: var(--background-primary);
-    overflow: hidden;
+    overflow: visible;
   }
   .chrono-wrapper.is-dragging {
     cursor: grabbing;
     user-select: none;
+  }
+  .sticky-chrome {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    flex-shrink: 0;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--background-primary);
+    isolation: isolate;
+    /* Avoid creating a scrollport here; it can confuse sticky stacking in nested layouts. */
+    overflow: visible;
   }
   .toolbar {
     display: flex;
@@ -1181,13 +1324,13 @@
     padding: 10px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
+    background: var(--background-primary);
   }
   .title {
     font-weight: 600;
     font-size: 13px;
     color: var(--text-normal);
     letter-spacing: 0.02em;
-    text-transform: uppercase;
   }
   .row-count {
     font-size: 11px;
@@ -1198,7 +1341,6 @@
     font-size: 9px;
     color: var(--text-faint);
     letter-spacing: 0.06em;
-    text-transform: uppercase;
     animation: fade-in-out 0.8s ease forwards;
   }
   @keyframes fade-in-out {
@@ -1220,7 +1362,6 @@
     padding: 0;
     cursor: pointer;
     letter-spacing: 0.06em;
-    text-transform: uppercase;
     text-decoration: underline;
     box-shadow: none;
   }
@@ -1235,7 +1376,6 @@
     color: var(--text-normal);
   }
   .search-input,
-  .filter-select,
   .range-input {
     appearance: none;
     -webkit-appearance: none;
@@ -1251,16 +1391,11 @@
     outline: none;
   }
   .search-input:focus,
-  .filter-select:focus,
   .range-input:focus {
     border-color: var(--text-muted);
   }
   .search-input {
     min-width: 160px;
-  }
-  .filter-select {
-    min-width: 108px;
-    padding-right: 18px;
   }
   .range-control {
     display: inline-flex;
@@ -1268,7 +1403,6 @@
     gap: 6px;
     font-size: 10px;
     color: var(--text-faint);
-    text-transform: uppercase;
     letter-spacing: 0.06em;
   }
   .range-input {
@@ -1280,6 +1414,9 @@
     font-size: 10px;
     color: var(--text-faint);
     opacity: 0.4;
+  }
+  .toolbar-menu-anchor {
+    position: relative;
   }
   .add-btn {
     appearance: none;
@@ -1301,31 +1438,10 @@
   .add-btn:hover {
     color: var(--text-normal);
   }
-  .template-menu {
-    display: flex;
-    gap: 16px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-  }
-  .template-item {
-    appearance: none;
-    -webkit-appearance: none;
-    font-family: inherit;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    background: none;
-    color: var(--text-faint);
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  .template-item:hover {
-    color: var(--text-normal);
+  .toolbar-menu {
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 180px;
   }
   .overview-strip {
     display: flex;
@@ -1334,6 +1450,16 @@
     overflow-x: auto;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
+  }
+  .header-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--background-primary);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .header-scroll::-webkit-scrollbar {
+    display: none;
   }
   .overview-card {
     appearance: none;
@@ -1356,13 +1482,16 @@
   .overview-card.is-focused {
     border-left: 2px solid var(--text-normal);
   }
+  .overview-card.is-dimmed {
+    opacity: 0.38;
+  }
   .overview-card:hover {
     border-left-color: var(--text-normal);
+    opacity: 1;
   }
   .overview-title {
     font-size: 11px;
     font-weight: 600;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
   }
   .overview-meta {
@@ -1371,9 +1500,11 @@
     line-height: 1.4;
   }
   .scroll-container {
-    flex: 1;
-    overflow: auto;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    overflow-y: clip;
     position: relative;
+    z-index: 0;
   }
   .row-list {
   }
@@ -1382,12 +1513,13 @@
   }
   .row-wrapper {
     min-height: var(--chronostra-row-height);
+    position: relative;
+    overflow: clip;
   }
   .empty-state {
     padding: 18px 16px;
     font-size: 11px;
     color: var(--text-faint);
-    text-transform: uppercase;
     letter-spacing: 0.06em;
   }
   .row-context-menu {
@@ -1437,7 +1569,6 @@
     font-size: 9px;
     color: var(--text-faint);
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
   :global(.chronostra-drag-ghost) {
     position: fixed;

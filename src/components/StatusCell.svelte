@@ -10,8 +10,8 @@
   const STATUS_CYCLE: ItemStatus[] = ['todo', 'in-progress', 'done'];
 
   const STATUS_LABELS: Record<ItemStatus, string> = {
-    'todo': 'To Do',
-    'in-progress': 'WIP',
+    'todo': 'To do',
+    'in-progress': 'In progress',
     'done': 'Done',
   };
 
@@ -50,7 +50,6 @@
     padding: 0 8px;
     font-size: 10px;
     letter-spacing: 0.04em;
-    text-transform: uppercase;
     background: inherit;
     box-sizing: border-box;
     overflow: hidden;
