@@ -6,10 +6,6 @@
   <img src="docs/chronostra-demo.gif" alt="Chronostra demo" width="100%" />
 </p>
 
-<p align="center">
-  <a href="docs/chronostra-demo.mp4">Watch the demo video</a>
-</p>
-
 # Chronostra
 
 **Chronos** (time) + **Stratum** (layer) — a life-goal planning table that lives inside your Obsidian vault.
