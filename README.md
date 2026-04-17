@@ -3,9 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/chronostra-demo.mp4">
-    <img src="docs/chronostra-demo-poster.png" alt="Chronostra demo video" width="100%" />
-  </a>
+  <img src="docs/chronostra-demo.gif" alt="Chronostra demo" width="100%" />
 </p>
 
 <p align="center">
