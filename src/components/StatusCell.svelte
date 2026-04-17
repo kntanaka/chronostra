@@ -1,94 +1,94 @@
 <script lang="ts">
   import type { ItemStatus } from '../types';
 
-  let { value, width, onchange }: {
+  let { value, width, onStatusChange }: {
     value?: ItemStatus;
     width: number;
-    onchange?: (newValue: ItemStatus) => void;
+    /** Renamed from `onchange` — avoids any ambiguity with DOM `change` in Svelte 5. */
+    onStatusChange?: (newValue: ItemStatus) => void;
   } = $props();
 
-  const STATUS_CYCLE: ItemStatus[] = ['todo', 'in-progress', 'done'];
-
-  const STATUS_LABELS: Record<ItemStatus, string> = {
-    'todo': 'To do',
-    'in-progress': 'In progress',
-    'done': 'Done',
-  };
-
-  function cycle() {
-    if (!onchange) return;
-    const current = value ?? 'todo';
-    const idx = STATUS_CYCLE.indexOf(current);
-    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-    onchange(next);
+  function handleChange(e: Event) {
+    if (!onStatusChange) return;
+    const raw = (e.currentTarget as HTMLSelectElement).value as ItemStatus;
+    onStatusChange(raw);
   }
+
+  const current = $derived(value ?? 'todo');
 </script>
 
+<!-- Same pattern as CommitmentCell: native <select> + change — reliable in Obsidian WebView. -->
 <div
-  class="status-cell"
-  class:editable={!!onchange}
-  class:status-todo={!value || value === 'todo'}
-  class:status-in-progress={value === 'in-progress'}
-  class:status-done={value === 'done'}
+  class="status-shell"
+  class:status-todo={current === 'todo'}
+  class:status-in-progress={current === 'in-progress'}
+  class:status-done={current === 'done'}
   style:min-width="{width}px"
   style:max-width="{width}px"
-  role="button"
-  tabindex="0"
-  onclick={cycle}
-  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') cycle(); }}
 >
-  <span class="status-dot"></span>
-  <span class="status-text">{STATUS_LABELS[value ?? 'todo']}</span>
+  <select
+    class="status-select"
+    value={current}
+    onchange={handleChange}
+    disabled={!onStatusChange}
+    title="Status"
+  >
+    <option value="todo">To do</option>
+    <option value="in-progress">WIP</option>
+    <option value="done">Done</option>
+  </select>
 </div>
 
 <style>
-  .status-cell {
+  .status-shell {
     display: flex;
     align-items: center;
-    gap: 5px;
     height: var(--chronostra-row-height);
-    padding: 0 8px;
-    font-size: 10px;
-    letter-spacing: 0.04em;
+    padding: 0 4px;
     background: inherit;
     box-sizing: border-box;
     overflow: hidden;
-    user-select: none;
   }
-  .status-cell.editable {
+
+  .status-select {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    width: 100%;
+    height: calc(var(--chronostra-row-height) - 10px);
+    padding: 0 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    color: inherit;
+    font-size: 10px;
+    letter-spacing: 0.04em;
     cursor: pointer;
+    outline: none;
+    box-shadow: none;
   }
-  .status-cell.editable:hover {
-    background: var(--background-secondary) !important;
+  .status-select:hover {
+    border-color: var(--background-modifier-border);
+    background: var(--background-secondary);
   }
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .status-select:focus {
+    border-color: var(--interactive-accent);
+    background: var(--background-secondary);
   }
-  .status-todo .status-dot {
-    background: var(--text-faint);
+  .status-select:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
-  .status-todo .status-text {
+
+  .status-todo .status-select {
     color: var(--text-faint);
   }
-  .status-in-progress .status-dot {
-    background: var(--interactive-accent);
-  }
-  .status-in-progress .status-text {
+  .status-in-progress .status-select {
     color: var(--text-normal);
+    font-weight: 500;
   }
-  .status-done .status-dot {
-    background: var(--text-muted);
-  }
-  .status-done .status-text {
+  .status-done .status-select {
     color: var(--text-muted);
     text-decoration: line-through;
-  }
-  .status-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 </style>

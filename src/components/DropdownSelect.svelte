@@ -25,6 +25,7 @@
   } = $props();
 
   let open = $state(false);
+  let rootEl = $state<HTMLDivElement | null>(null);
 
   const selectedOption = $derived(
     options.find((option) => option.value === value) ?? null
@@ -52,14 +53,21 @@
       open = false;
     }
   }
+
+  function handleWindowClick(e: MouseEvent) {
+    if (!open || !rootEl) return;
+    const target = e.target;
+    if (target instanceof Node && rootEl.contains(target)) return;
+    open = false;
+  }
 </script>
 
-<svelte:window onclick={open ? closeMenu : undefined} onkeydown={open ? handleWindowKeydown : undefined} />
+<svelte:window onclick={open ? handleWindowClick : undefined} onkeydown={open ? handleWindowKeydown : undefined} />
 
 <div
+  bind:this={rootEl}
   class={`dropdown-select ${variant}`}
   style={`--dropdown-min-width: ${minWidth}px;`}
-  onpointerdown={(e) => e.stopPropagation()}
 >
   <button
     type="button"
@@ -76,7 +84,7 @@
   </button>
 
   {#if open}
-    <div class="context-menu dropdown-menu" onpointerdown={(e) => e.stopPropagation()}>
+    <div class="context-menu dropdown-menu">
       {#each options as option}
         <button
           type="button"

@@ -32,7 +32,7 @@
   const STATUS_FILTER_OPTIONS = [
     { value: 'all', label: 'All status' },
     { value: 'todo', label: 'To do' },
-    { value: 'in-progress', label: 'In progress' },
+    { value: 'in-progress', label: 'WIP' },
     { value: 'done', label: 'Done' },
   ];
   const SCOPE_FILTER_OPTIONS = [
@@ -282,7 +282,6 @@
   }
 
   let wrapperEl: HTMLDivElement | undefined = $state();
-  let headerScrollEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
 
@@ -318,25 +317,9 @@
   }
 
   let focusYear = $state<number | null>(null);
-  let syncingHeaderScroll = false;
-  let syncingBodyScroll = false;
 
   function handleScroll() {
-    if (!scrollContainer || !headerScrollEl || syncingBodyScroll) return;
-    syncingHeaderScroll = true;
-    headerScrollEl.scrollLeft = scrollContainer.scrollLeft;
-    queueMicrotask(() => {
-      syncingHeaderScroll = false;
-    });
-  }
-
-  function handleHeaderScroll() {
-    if (!scrollContainer || !headerScrollEl || syncingHeaderScroll) return;
-    syncingBodyScroll = true;
-    scrollContainer.scrollLeft = headerScrollEl.scrollLeft;
-    queueMicrotask(() => {
-      syncingBodyScroll = false;
-    });
+    // Reserved for future scroll-linked behavior.
   }
 
   let popupText = $state<string | null>(null);
@@ -1143,27 +1126,6 @@
         {/each}
       </div>
     {/if}
-
-    <div
-      class="header-scroll"
-      bind:this={headerScrollEl}
-      onscroll={handleHeaderScroll}
-    >
-      <TableHeader
-        {hierarchyWidth}
-        {metricWidths}
-        {metricFrozen}
-        {focusYear}
-        {timelineDisplay}
-        {birthYear}
-        {timelineStartYear}
-        {timelineEndYear}
-        onhierarchyresize={handleHierarchyResize}
-        onresize={handleMetricResize}
-        ontogglefreeze={handleToggleFreeze}
-        onfocusyear={(y) => { focusYear = y; }}
-      />
-    </div>
   </div>
 
   <div
@@ -1171,6 +1133,21 @@
     bind:this={scrollContainer}
     onscroll={handleScroll}
   >
+    <TableHeader
+      {hierarchyWidth}
+      {metricWidths}
+      {metricFrozen}
+      {focusYear}
+      {timelineDisplay}
+      {birthYear}
+      {timelineStartYear}
+      {timelineEndYear}
+      onhierarchyresize={handleHierarchyResize}
+      onresize={handleMetricResize}
+      ontogglefreeze={handleToggleFreeze}
+      onfocusyear={(y) => { focusYear = y; }}
+    />
+
     <div
       class="row-list"
       class:no-borders={!showBorders}
@@ -1315,6 +1292,7 @@
     isolation: isolate;
     /* Avoid creating a scrollport here; it can confuse sticky stacking in nested layouts. */
     overflow: visible;
+    pointer-events: none;
   }
   .toolbar {
     display: flex;
@@ -1325,6 +1303,7 @@
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
     background: var(--background-primary);
+    pointer-events: auto;
   }
   .title {
     font-weight: 600;
@@ -1450,16 +1429,7 @@
     overflow-x: auto;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
-  }
-  .header-scroll {
-    overflow-x: auto;
-    overflow-y: hidden;
-    background: var(--background-primary);
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .header-scroll::-webkit-scrollbar {
-    display: none;
+    pointer-events: auto;
   }
   .overview-card {
     appearance: none;
@@ -1501,8 +1471,7 @@
   }
   .scroll-container {
     flex: 0 0 auto;
-    overflow-x: auto;
-    overflow-y: clip;
+    overflow: auto;
     position: relative;
     z-index: 0;
   }
@@ -1514,7 +1483,7 @@
   .row-wrapper {
     min-height: var(--chronostra-row-height);
     position: relative;
-    overflow: clip;
+    overflow: visible;
   }
   .empty-state {
     padding: 18px 16px;

@@ -153,7 +153,7 @@
   {/each}
 
   <div
-    class="metric-col"
+    class="metric-col metric-col-status"
     class:frozen={frozenFlags[STATUS_COL_INDEX]}
     style:position={frozenFlags[STATUS_COL_INDEX] ? 'sticky' : 'relative'}
     style:left={stickyOffsets[STATUS_COL_INDEX] != null ? `${stickyOffsets[STATUS_COL_INDEX]}px` : 'auto'}
@@ -164,7 +164,7 @@
     <StatusCell
       value={row.status}
       width={metricWidths[STATUS_COL_INDEX]}
-      onchange={onstatuschange ? (v) => onstatuschange(row.id, v) : undefined}
+      onStatusChange={onstatuschange ? (v) => onstatuschange(row.id, v) : undefined}
     />
   </div>
 
@@ -224,15 +224,23 @@
     background: var(--background-secondary) !important;
   }
   .metric-col {
-    z-index: 0;
+    z-index: 1;
     flex-shrink: 0;
     transition: background 0.08s ease;
   }
+  /* Status sits before Focus in DOM; if columns overlap (sticky/subpixel), later sibling
+     would steal clicks. Keep Status above Focus so the hit target matches the label. */
+  .metric-col.metric-col-status {
+    z-index: 3;
+  }
+  .metric-col.metric-col-status.frozen {
+    z-index: 4;
+  }
+  .metric-col.frozen {
+    z-index: 2;
+  }
   .metric-col.timeline-start-divider {
     box-shadow: inset -1px 0 0 0 var(--chronostra-timeline-divider);
-  }
-  .frozen {
-    z-index: 2;
   }
   .timeline-wrap {
     position: relative;
@@ -241,20 +249,10 @@
     min-width: var(--chronostra-col-timeline-w);
     max-width: var(--chronostra-col-timeline-w);
     flex-shrink: 0;
+    z-index: 0;
   }
-  .milestone-col {
-    position: relative;
-  }
-  .milestone-col::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--chronostra-milestone-line);
-    pointer-events: none;
-    z-index: 1;
+  .milestone-col :global(.timeline-cell) {
+    border-left: 1px solid var(--chronostra-milestone-line);
   }
   .table-row.dragged {
     opacity: 0.2;

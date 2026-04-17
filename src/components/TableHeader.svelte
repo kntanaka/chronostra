@@ -174,6 +174,9 @@
     display: flex;
     width: max-content;
     min-width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 10;
     background: var(--background-primary);
     border-bottom: 1px solid var(--text-faint);
   }
