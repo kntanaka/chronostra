@@ -3,7 +3,13 @@
 </p>
 
 <p align="center">
-  <video src="docs/chronostra-demo.mov" controls muted playsinline width="100%"></video>
+  <a href="docs/chronostra-demo.mp4">
+    <img src="docs/chronostra-demo-poster.png" alt="Chronostra demo video" width="100%" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/chronostra-demo.mp4">Watch the demo video</a>
 </p>
 
 # Chronostra
