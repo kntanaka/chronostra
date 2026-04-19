@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
+  import type { CellColumnKey, CellNavigationDirection, ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
   import { effectiveScope, MAX_DEPTH } from '../types';
   import type { TimelineDisplay } from '../settings';
   import { TreeState } from '../stores/tree-state.svelte';
@@ -26,7 +26,7 @@
     nodes: TemplateDraft[];
   }
 
-  const ROW_HEIGHT = 36;
+  const ROW_HEIGHT = 64;
   const HISTORY_LIMIT = 50;
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
   const STATUS_FILTER_OPTIONS = [
@@ -325,6 +325,7 @@
   let popupText = $state<string | null>(null);
   let popupX = $state(0);
   let popupY = $state(0);
+  let activeRowId = $state<string | null>(null);
 
   function handlePopup(text: string | null, x: number, y: number) {
     popupText = text;
@@ -346,6 +347,70 @@
   let redoStack = $state<ChronoData[]>([]);
   let saveIndicator = $state(false);
   let pendingEditId = $state<string | null>(null);
+  let pendingEditColumn = $state<CellColumnKey | null>(null);
+
+  function getColumnOrder(): CellColumnKey[] {
+    const years = Array.from(
+      { length: Math.max(timelineEndYear, timelineStartYear) - Math.min(timelineStartYear, timelineEndYear) + 1 },
+      (_, i) => Math.min(timelineStartYear, timelineEndYear) + i
+    );
+    return [
+      'hierarchy',
+      'metric:future',
+      'metric:now',
+      'metric:gap',
+      'status',
+      'commitment',
+      ...years.map((year) => `timeline:${year}` as const),
+    ];
+  }
+
+  function queueEditTarget(rowId: string, column: CellColumnKey) {
+    pendingEditId = rowId;
+    pendingEditColumn = column;
+    activeRowId = rowId;
+  }
+
+  function clearEditTarget() {
+    pendingEditId = null;
+    pendingEditColumn = null;
+  }
+
+  function handleCellNavigate(rowId: string, column: CellColumnKey, direction: CellNavigationDirection) {
+    const rowIndex = flatRows.findIndex((row) => row.id === rowId);
+    if (rowIndex === -1) return;
+
+    const columns = getColumnOrder();
+    const columnIndex = columns.indexOf(column);
+    if (columnIndex === -1) return;
+
+    let nextRowIndex = rowIndex;
+    let nextColumnIndex = columnIndex;
+
+    if (direction === 'up') nextRowIndex -= 1;
+    if (direction === 'down') nextRowIndex += 1;
+    if (direction === 'left') {
+      if (columnIndex === 0) {
+        nextRowIndex -= 1;
+        nextColumnIndex = columns.length - 1;
+      } else {
+        nextColumnIndex -= 1;
+      }
+    }
+    if (direction === 'right') {
+      if (columnIndex === columns.length - 1) {
+        nextRowIndex += 1;
+        nextColumnIndex = 0;
+      } else {
+        nextColumnIndex += 1;
+      }
+    }
+
+    if (nextRowIndex < 0 || nextRowIndex >= flatRows.length) return;
+    if (nextColumnIndex < 0 || nextColumnIndex >= columns.length) return;
+
+    queueEditTarget(flatRows[nextRowIndex].id, columns[nextColumnIndex]);
+  }
 
   function emitChange() {
     data = { ...data };
@@ -1156,7 +1221,11 @@
       style:min-width="100%"
     >
       {#each flatRows as row (row.id)}
-        <div class="row-wrapper">
+        <div
+          class="row-wrapper"
+          class:active-layer={activeRowId === row.id}
+          onpointerdown={() => { activeRowId = row.id; }}
+        >
           <TableRow
             {row}
             {hierarchyWidth}
@@ -1167,7 +1236,7 @@
             {timelineStartYear}
             {timelineEndYear}
             {showSummaryMeta}
-            autoEdit={pendingEditId === row.id}
+            autoEditColumn={pendingEditId === row.id ? pendingEditColumn : null}
             isDragged={dragState?.draggedId === row.id}
             isDropTarget={dragState?.targetId === row.id}
             dropPosition={dragState?.targetId === row.id ? dragState.position : undefined}
@@ -1179,10 +1248,11 @@
             onlabelchange={handleLabelChange}
             ontimelinechange={handleTimelineChange}
             onrowcontextmenu={handleRowContextMenu}
-            onautoedited={() => { pendingEditId = null; }}
+            onautoedited={clearEditTarget}
             ondragstart={handleDragStart}
             onnoteclick={handleNoteClick}
             oncommitmentchange={handleCommitmentChange}
+            onnavigate={handleCellNavigate}
           />
         </div>
       {/each}
@@ -1436,6 +1506,8 @@
     -webkit-appearance: none;
     font-family: inherit;
     min-width: 180px;
+    max-width: 240px;
+    min-height: 64px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1463,11 +1535,26 @@
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.4;
   }
   .overview-meta {
     font-size: 10px;
     color: var(--text-faint);
     line-height: 1.4;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
   }
   .scroll-container {
     flex: 0 0 auto;
@@ -1475,15 +1562,22 @@
     position: relative;
     z-index: 0;
   }
+  .scroll-container:focus-within {
+    z-index: 80;
+  }
   .row-list {
   }
   .row-list.no-borders :global(.table-row) {
     border-bottom: none;
   }
   .row-wrapper {
-    min-height: var(--chronostra-row-height);
+    min-height: var(--chronostra-body-row-height);
     position: relative;
     overflow: visible;
+    z-index: 0;
+  }
+  .row-wrapper.active-layer {
+    z-index: 60;
   }
   .empty-state {
     padding: 18px 16px;

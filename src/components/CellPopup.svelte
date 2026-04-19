@@ -13,7 +13,7 @@
 <style>
   .cell-popup {
     position: absolute;
-    z-index: 200;
+    z-index: 500;
     max-width: 320px;
     padding: 8px 12px;
     background: var(--chronostra-menu-bg, var(--background-primary));

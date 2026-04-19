@@ -56,6 +56,37 @@ If asked to check PR comments, review feedback, or bot remarks for this project,
 
 Treat that PR as the default review context for comment-follow-up work.
 
+## Obsidian Review Bot Guardrails
+
+Before finishing changes that may ship to the plugin repo, do a quick pass against the patterns that ObsidianReviewBot has already flagged on this project.
+
+### Required Checks
+
+- Promise-returning calls must be `await`ed, chained with rejection handling, or explicitly marked with `void`.
+- Do not make lifecycle methods `async` unless they actually need `await`.
+- Avoid `any`. Use a concrete type or `unknown` plus narrowing.
+- UI copy must use sentence case.
+- Do not mutate presentation via `element.style.maxWidth`, `element.style.setProperty`, or similar inline style writes for theming/layout.
+- Prefer CSS classes or `setCssProps` when CSS custom properties must be updated dynamically.
+
+### Project-Specific Watchouts
+
+- Settings labels and descriptions in `src/settings.ts` are review-bot-sensitive. Recheck sentence case there before shipping.
+- Changes in `src/main.ts` that touch DOM styling should default to classes, not imperative style mutation.
+- If a new fire-and-forget async path is intentional, mark it with `void` so the intent is explicit.
+
+### Pre-Push Habit
+
+Before pushing bot-related fixes, scan the changed files for:
+
+- `async` methods without `await`
+- bare promise calls
+- `any`
+- all-caps UI labels like `WIP`
+- `element.style.` writes
+
+If any appear, treat them as likely bot findings and fix them before push.
+
 ## Product Ideas On Hold
 
 ### Obsidian-Embedded Codex Terminal

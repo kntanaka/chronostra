@@ -1,12 +1,16 @@
 <script lang="ts">
-  import type { ItemStatus } from '../types';
+  import { tick } from 'svelte';
+  import type { CellNavigationDirection, ItemStatus } from '../types';
 
-  let { value, width, onStatusChange }: {
+  let { value, width, autoEdit = false, onStatusChange, onautoedited, onnavigate }: {
     value?: ItemStatus;
     width: number;
-    /** Renamed from `onchange` — avoids any ambiguity with DOM `change` in Svelte 5. */
+    autoEdit?: boolean;
     onStatusChange?: (newValue: ItemStatus) => void;
+    onautoedited?: () => void;
+    onnavigate?: (direction: CellNavigationDirection) => void;
   } = $props();
+  let selectEl = $state<HTMLSelectElement | null>(null);
 
   function handleChange(e: Event) {
     if (!onStatusChange) return;
@@ -15,9 +19,30 @@
   }
 
   const current = $derived(value ?? 'todo');
+
+  $effect(() => {
+    if (autoEdit && selectEl) {
+      void focusSelect();
+      onautoedited?.();
+    }
+  });
+
+  async function focusSelect() {
+    await tick();
+    selectEl?.focus();
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      onnavigate?.(e.shiftKey ? 'left' : 'right');
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onnavigate?.(e.shiftKey ? 'up' : 'down');
+    }
+  }
 </script>
 
-<!-- Same pattern as CommitmentCell: native <select> + change — reliable in Obsidian WebView. -->
 <div
   class="status-shell"
   class:status-todo={current === 'todo'}
@@ -29,12 +54,14 @@
   <select
     class="status-select"
     value={current}
+    bind:this={selectEl}
     onchange={handleChange}
+    onkeydown={handleKeydown}
     disabled={!onStatusChange}
     title="Status"
   >
     <option value="todo">To do</option>
-    <option value="in-progress">WIP</option>
+    <option value="in-progress">In progress</option>
     <option value="done">Done</option>
   </select>
 </div>
@@ -43,11 +70,11 @@
   .status-shell {
     display: flex;
     align-items: center;
-    height: var(--chronostra-row-height);
+    height: var(--chronostra-body-row-height);
     padding: 0 4px;
     background: inherit;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .status-select {
@@ -55,8 +82,8 @@
     -webkit-appearance: none;
     font-family: inherit;
     width: 100%;
-    height: calc(var(--chronostra-row-height) - 10px);
-    padding: 0 6px;
+    height: calc(var(--chronostra-body-row-height) - 12px);
+    padding: 0 8px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 0;
@@ -67,14 +94,17 @@
     outline: none;
     box-shadow: none;
   }
+
   .status-select:hover {
     border-color: var(--background-modifier-border);
     background: var(--background-secondary);
   }
+
   .status-select:focus {
     border-color: var(--interactive-accent);
     background: var(--background-secondary);
   }
+
   .status-select:disabled {
     cursor: default;
     opacity: 0.6;
@@ -83,10 +113,12 @@
   .status-todo .status-select {
     color: var(--text-faint);
   }
+
   .status-in-progress .status-select {
     color: var(--text-normal);
     font-weight: 500;
   }
+
   .status-done .status-select {
     color: var(--text-muted);
     text-decoration: line-through;

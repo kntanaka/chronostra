@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FlatRow, ItemStatus } from '../types';
+  import type { CellColumnKey, CellNavigationDirection, FlatRow, ItemStatus } from '../types';
   import { effectiveScope } from '../types';
   import HierarchyCell from './HierarchyCell.svelte';
   import MetricCell from './MetricCell.svelte';
@@ -9,7 +9,7 @@
 
   import type { Commitment } from '../types';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, showSummaryMeta = false, autoEdit, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, showSummaryMeta = false, autoEditColumn, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange, onnavigate }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
@@ -19,7 +19,7 @@
     timelineStartYear: number;
     timelineEndYear: number;
     showSummaryMeta?: boolean;
-    autoEdit?: boolean;
+    autoEditColumn?: CellColumnKey | null;
     isDragged?: boolean;
     isDropTarget?: boolean;
     dropPosition?: 'before' | 'after' | 'inside';
@@ -35,6 +35,7 @@
     ondragstart?: (e: PointerEvent, rowId: string) => void;
     onnoteclick?: (id: string) => void;
     oncommitmentchange?: (id: string, next: Commitment | undefined) => void;
+    onnavigate?: (rowId: string, column: CellColumnKey, direction: CellNavigationDirection) => void;
   } = $props();
 
   type DisplayKind = 'category' | 'vision' | 'goal' | 'step';
@@ -96,6 +97,10 @@
   function handleContextMenu(e: MouseEvent) {
     onrowcontextmenu?.(e, row.id);
   }
+
+  function handleNavigate(column: CellColumnKey, direction: CellNavigationDirection) {
+    onnavigate?.(row.id, column, direction);
+  }
 </script>
 
 <div
@@ -121,13 +126,14 @@
       {row}
       width={hierarchyWidth}
       {showSummaryMeta}
-      {autoEdit}
+      autoEdit={autoEditColumn === 'hierarchy'}
       isDragging={isDragged}
       {ontoggle}
       {onlabelchange}
       {onautoedited}
       ondragstart={ondragstart ? (e) => ondragstart(e, row.id) : undefined}
       onnoteclick={onnoteclick ? () => onnoteclick(row.id) : undefined}
+      onnavigate={(direction) => handleNavigate('hierarchy', direction)}
     />
   </div>
 
@@ -147,7 +153,10 @@
         value={row.metrics[type]}
         {type}
         width={metricWidths[i]}
+        autoEdit={autoEditColumn === `metric:${type}`}
         onchange={onmetricchange ? (v) => onmetricchange(row.id, type, v) : undefined}
+        onautoedited={onautoedited}
+        onnavigate={(direction) => handleNavigate(`metric:${type}`, direction)}
       />
     </div>
   {/each}
@@ -164,7 +173,10 @@
     <StatusCell
       value={row.status}
       width={metricWidths[STATUS_COL_INDEX]}
+      autoEdit={autoEditColumn === 'status'}
       onStatusChange={onstatuschange ? (v) => onstatuschange(row.id, v) : undefined}
+      onautoedited={onautoedited}
+      onnavigate={(direction) => handleNavigate('status', direction)}
     />
   </div>
 
@@ -183,7 +195,10 @@
       width={metricWidths[FOCUS_COL_INDEX]}
       empty={row.depth === 0}
       needsDeadline={commitmentMissingDeadline}
+      autoEdit={autoEditColumn === 'commitment'}
       onchange={oncommitmentchange ? (next) => oncommitmentchange(row.id, next) : undefined}
+      onautoedited={onautoedited}
+      onnavigate={(direction) => handleNavigate('commitment', direction)}
     />
   </div>
 
@@ -191,7 +206,15 @@
     {@const entry = timelineByYear.get(year) ?? { year, text: '' }}
     {@const milestone = birthYear != null && MILESTONE_AGES.has(year - birthYear)}
     <div class="timeline-wrap" class:milestone-col={milestone}>
-      <TimelineCell {entry} {onpopup} focused={focusYear === year} onchange={ontimelinechange ? (year, text) => ontimelinechange(row.id, year, text) : undefined} />
+      <TimelineCell
+        {entry}
+        {onpopup}
+        focused={focusYear === year}
+        autoEdit={autoEditColumn === `timeline:${year}`}
+        onchange={ontimelinechange ? (year, text) => ontimelinechange(row.id, year, text) : undefined}
+        onautoedited={onautoedited}
+        onnavigate={(direction) => handleNavigate(`timeline:${year}`, direction)}
+      />
     </div>
   {/each}
 </div>
@@ -209,6 +232,9 @@
   .table-row:hover {
     background: var(--background-secondary) !important;
   }
+  .table-row:focus-within {
+    z-index: 90;
+  }
   .table-row:hover :global(.hierarchy-cell),
   .table-row:hover :global(.metric-cell),
   .table-row:hover :global(.timeline-cell) {
@@ -218,6 +244,10 @@
     z-index: 2;
     flex-shrink: 0;
     transition: background 0.08s ease;
+    overflow: visible;
+  }
+  .hierarchy-wrap:focus-within {
+    z-index: 95;
   }
   .table-row:hover .hierarchy-wrap,
   .table-row:hover .metric-col.frozen {
@@ -227,6 +257,10 @@
     z-index: 1;
     flex-shrink: 0;
     transition: background 0.08s ease;
+    overflow: visible;
+  }
+  .metric-col:focus-within {
+    z-index: 95 !important;
   }
   /* Status sits before Focus in DOM; if columns overlap (sticky/subpixel), later sibling
      would steal clicks. Keep Status above Focus so the hit target matches the label. */
@@ -250,6 +284,10 @@
     max-width: var(--chronostra-col-timeline-w);
     flex-shrink: 0;
     z-index: 0;
+    overflow: visible;
+  }
+  .timeline-wrap:focus-within {
+    z-index: 95;
   }
   .milestone-col :global(.timeline-cell) {
     border-left: 1px solid var(--chronostra-milestone-line);

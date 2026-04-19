@@ -1,13 +1,18 @@
 <script lang="ts">
-  import type { Commitment } from '../types';
+  import { tick } from 'svelte';
+  import type { CellNavigationDirection, Commitment } from '../types';
 
-  let { value, width, empty, needsDeadline, onchange }: {
+  let { value, width, empty, needsDeadline, autoEdit = false, onchange, onautoedited, onnavigate }: {
     value?: Commitment;
     width: number;
     empty?: boolean;
     needsDeadline?: boolean;
+    autoEdit?: boolean;
     onchange?: (next: Commitment | undefined) => void;
+    onautoedited?: () => void;
+    onnavigate?: (direction: CellNavigationDirection) => void;
   } = $props();
+  let selectEl = $state<HTMLSelectElement | null>(null);
 
   function handleChange(e: Event) {
     if (!onchange) return;
@@ -17,6 +22,28 @@
   }
 
   const current = $derived(value ?? '');
+
+  $effect(() => {
+    if (autoEdit && !empty && selectEl) {
+      void focusSelect();
+      onautoedited?.();
+    }
+  });
+
+  async function focusSelect() {
+    await tick();
+    selectEl?.focus();
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      onnavigate?.(e.shiftKey ? 'left' : 'right');
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onnavigate?.(e.shiftKey ? 'up' : 'down');
+    }
+  }
 </script>
 
 <div
@@ -32,8 +59,10 @@
   {#if !empty}
     <select
       class="commitment-select"
+      bind:this={selectEl}
       value={current}
       onchange={handleChange}
+      onkeydown={handleKeydown}
       disabled={!onchange}
       title={
         value === 'must'
@@ -54,7 +83,7 @@
   .commitment-cell {
     display: flex;
     align-items: center;
-    height: var(--chronostra-row-height);
+    height: var(--chronostra-body-row-height);
     padding: 0 4px;
     background: inherit;
     box-sizing: border-box;
@@ -65,7 +94,7 @@
     -webkit-appearance: none;
     font-family: inherit;
     width: 100%;
-    height: calc(var(--chronostra-row-height) - 10px);
+    height: calc(var(--chronostra-body-row-height) - 12px);
     padding: 0 6px;
     background: transparent;
     border: 1px solid transparent;

@@ -67,6 +67,7 @@
 <div
   bind:this={rootEl}
   class={`dropdown-select ${variant}`}
+  class:is-open={open}
   style={`--dropdown-min-width: ${minWidth}px;`}
 >
   <button
@@ -77,6 +78,7 @@
     {title}
     aria-haspopup="menu"
     aria-expanded={open}
+    onpointerdown={(e) => e.stopPropagation()}
     onclick={toggleMenu}
   >
     <span class="dropdown-label">{selectedOption?.label ?? placeholder}</span>
@@ -84,7 +86,7 @@
   </button>
 
   {#if open}
-    <div class="context-menu dropdown-menu">
+    <div class="context-menu dropdown-menu" onpointerdown={(e) => e.stopPropagation()}>
       {#each options as option}
         <button
           type="button"
@@ -104,6 +106,9 @@
     position: relative;
     flex-shrink: 0;
     min-width: var(--dropdown-min-width);
+  }
+  .dropdown-select.is-open {
+    z-index: 220;
   }
   .dropdown-trigger {
     appearance: none;
@@ -169,7 +174,7 @@
   }
   .context-menu {
     position: absolute;
-    z-index: 100;
+    z-index: 220;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     padding: 4px 0;

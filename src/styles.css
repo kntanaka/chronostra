@@ -36,6 +36,7 @@
   /* Layout */
   --chronostra-col-timeline-w: 100px;
   --chronostra-row-height: 32px;
+  --chronostra-body-row-height: 64px;
 
   width: 100%;
   min-height: 80vh;

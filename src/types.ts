@@ -82,6 +82,17 @@ export interface FlatRow {
   parentIds: string[];
 }
 
+export type CellColumnKey =
+  | 'hierarchy'
+  | 'metric:future'
+  | 'metric:now'
+  | 'metric:gap'
+  | 'status'
+  | 'commitment'
+  | `timeline:${number}`;
+
+export type CellNavigationDirection = 'up' | 'down' | 'left' | 'right';
+
 export interface ChronoData {
   categories: TreeNode[];
 }
