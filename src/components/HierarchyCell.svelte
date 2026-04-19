@@ -260,13 +260,15 @@
 <style>
   .hierarchy-cell {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
     min-height: var(--chronostra-body-row-height);
-    overflow: hidden;
+    overflow: visible;
     box-sizing: border-box;
     background: inherit;
     position: relative;
+    padding-top: 4px;
+    padding-bottom: 4px;
   }
   .drag-handle {
     display: flex;
@@ -311,37 +313,44 @@
     box-shadow: none !important;
     outline: none !important;
     margin: 0;
-    padding: 0;
+    padding: 0 !important;
     width: 100%;
     min-width: 0;
+    min-height: 0;
+    height: auto;
+    align-self: flex-start;
+    overflow: visible;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: normal;
     word-break: break-word;
-    line-height: 1.4;
     color: inherit;
     font: inherit;
     text-align: left;
+    vertical-align: top;
   }
   .label-stack {
     min-width: 0;
     display: flex;
     flex: 1;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 1px;
-    padding: 5px 0;
+    padding: 0;
     position: relative;
     z-index: 120;
+    align-self: stretch;
   }
   .label-line {
     display: flex;
     align-items: flex-start;
     gap: 6px;
     min-width: 0;
+    align-self: stretch;
   }
   .label.editable {
     cursor: text;
