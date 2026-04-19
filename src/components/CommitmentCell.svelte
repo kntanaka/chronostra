@@ -13,6 +13,7 @@
     onnavigate?: (direction: CellNavigationDirection) => void;
   } = $props();
   let selectEl = $state<HTMLSelectElement | null>(null);
+  let focusedValue = $state<Commitment | ''>('');
 
   function handleChange(e: Event) {
     if (!onchange) return;
@@ -42,6 +43,12 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       onnavigate?.(e.shiftKey ? 'up' : 'down');
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (current !== focusedValue) {
+        onchange?.(focusedValue === '' ? undefined : focusedValue);
+      }
+      selectEl?.blur();
     }
   }
 </script>
@@ -62,6 +69,9 @@
       bind:this={selectEl}
       value={current}
       onchange={handleChange}
+      onfocus={() => {
+        focusedValue = current;
+      }}
       onkeydown={handleKeydown}
       disabled={!onchange}
       title={

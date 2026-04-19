@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import type { CellColumnKey, CellNavigationDirection, ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
   import { effectiveScope, MAX_DEPTH } from '../types';
   import type { TimelineDisplay } from '../settings';
@@ -369,11 +370,38 @@
     pendingEditId = rowId;
     pendingEditColumn = column;
     activeRowId = rowId;
+    void scrollCellIntoView(rowId, column);
   }
 
   function clearEditTarget() {
     pendingEditId = null;
     pendingEditColumn = null;
+  }
+
+  async function scrollCellIntoView(rowId: string, column: CellColumnKey) {
+    await tick();
+    if (!scrollContainer) return;
+
+    const target = scrollContainer.querySelector<HTMLElement>(
+      `[data-row-id="${rowId}"][data-column-key="${column}"]`
+    );
+    if (!target) return;
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const padding = 16;
+
+    if (targetRect.left < containerRect.left + padding) {
+      scrollContainer.scrollLeft -= containerRect.left + padding - targetRect.left;
+    } else if (targetRect.right > containerRect.right - padding) {
+      scrollContainer.scrollLeft += targetRect.right - (containerRect.right - padding);
+    }
+
+    if (targetRect.top < containerRect.top + padding) {
+      scrollContainer.scrollTop -= containerRect.top + padding - targetRect.top;
+    } else if (targetRect.bottom > containerRect.bottom - padding) {
+      scrollContainer.scrollTop += targetRect.bottom - (containerRect.bottom - padding);
+    }
   }
 
   function handleCellNavigate(rowId: string, column: CellColumnKey, direction: CellNavigationDirection) {

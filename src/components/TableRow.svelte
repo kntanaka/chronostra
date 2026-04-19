@@ -116,6 +116,8 @@
 >
   <div
     class="hierarchy-wrap frozen"
+    data-row-id={row.id}
+    data-column-key="hierarchy"
     style:position="sticky"
     style:left="0px"
     style:min-width="{hierarchyWidth}px"
@@ -142,6 +144,8 @@
     {@const offset = stickyOffsets[i]}
     <div
       class="metric-col"
+      data-row-id={row.id}
+      data-column-key={`metric:${type}`}
       class:frozen={isFrozen}
       style:position={isFrozen ? 'sticky' : 'relative'}
       style:left={offset != null ? `${offset}px` : 'auto'}
@@ -163,6 +167,8 @@
 
   <div
     class="metric-col metric-col-status"
+    data-row-id={row.id}
+    data-column-key="status"
     class:frozen={frozenFlags[STATUS_COL_INDEX]}
     style:position={frozenFlags[STATUS_COL_INDEX] ? 'sticky' : 'relative'}
     style:left={stickyOffsets[STATUS_COL_INDEX] != null ? `${stickyOffsets[STATUS_COL_INDEX]}px` : 'auto'}
@@ -182,6 +188,8 @@
 
   <div
     class="metric-col"
+    data-row-id={row.id}
+    data-column-key="commitment"
     class:frozen={frozenFlags[FOCUS_COL_INDEX]}
     class:timeline-start-divider={true}
     style:position={frozenFlags[FOCUS_COL_INDEX] ? 'sticky' : 'relative'}
@@ -205,7 +213,12 @@
   {#each years as year (year)}
     {@const entry = timelineByYear.get(year) ?? { year, text: '' }}
     {@const milestone = birthYear != null && MILESTONE_AGES.has(year - birthYear)}
-    <div class="timeline-wrap" class:milestone-col={milestone}>
+    <div
+      class="timeline-wrap"
+      data-row-id={row.id}
+      data-column-key={`timeline:${year}`}
+      class:milestone-col={milestone}
+    >
       <TimelineCell
         {entry}
         {onpopup}
@@ -248,6 +261,8 @@
   }
   .hierarchy-wrap:focus-within {
     z-index: 95;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--background-secondary) 72%, transparent) !important;
   }
   .table-row:hover .hierarchy-wrap,
   .table-row:hover .metric-col.frozen {
@@ -261,6 +276,8 @@
   }
   .metric-col:focus-within {
     z-index: 95 !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--background-secondary) 72%, transparent) !important;
   }
   /* Status sits before Focus in DOM; if columns overlap (sticky/subpixel), later sibling
      would steal clicks. Keep Status above Focus so the hit target matches the label. */
@@ -288,6 +305,8 @@
   }
   .timeline-wrap:focus-within {
     z-index: 95;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--background-secondary) 72%, transparent) !important;
   }
   .milestone-col :global(.timeline-cell) {
     border-left: 1px solid var(--chronostra-milestone-line);

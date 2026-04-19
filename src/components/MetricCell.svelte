@@ -14,8 +14,10 @@
 
   let editing = $state(false);
   let editValue = $state('');
+  let skipBlurCommit = $state(false);
   let shellEl = $state<HTMLElement | null>(null);
   let inputEl = $state<HTMLTextAreaElement | null>(null);
+  let triggerEl = $state<HTMLButtonElement | null>(null);
   let editorTop = $state(0);
   let editorLeft = $state(0);
   let editorWidth = $state(0);
@@ -99,10 +101,26 @@
   }
 
   function commitEdit() {
+    if (skipBlurCommit) {
+      skipBlurCommit = false;
+      return;
+    }
     if (editing && editValue !== value) {
       onchange?.(editValue);
     }
     editing = false;
+  }
+
+  async function focusTrigger() {
+    await tick();
+    triggerEl?.focus();
+  }
+
+  function cancelEdit() {
+    skipBlurCommit = true;
+    editValue = value;
+    editing = false;
+    void focusTrigger();
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -116,15 +134,33 @@
       commitEdit();
       onnavigate?.(e.shiftKey ? 'up' : 'down');
     } else if (e.key === 'Escape') {
-      editing = false;
+      e.preventDefault();
+      cancelEdit();
     }
   }
 
   function handleStartEditKeydown(e: KeyboardEvent) {
     if (e.isComposing) return;
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'F2') {
       e.preventDefault();
       startEdit();
+      return;
+    }
+
+    const direction =
+      e.key === 'ArrowUp'
+        ? 'up'
+        : e.key === 'ArrowDown'
+          ? 'down'
+          : e.key === 'ArrowLeft'
+            ? 'left'
+            : e.key === 'ArrowRight'
+              ? 'right'
+              : null;
+
+    if (direction) {
+      e.preventDefault();
+      onnavigate?.(direction);
     }
   }
 </script>
@@ -159,6 +195,7 @@
     class:editable={!!onchange}
     style:color={color}
     title={value}
+    bind:this={triggerEl}
     onclick={startEdit}
     onkeydown={handleStartEditKeydown}
   >
