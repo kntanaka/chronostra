@@ -128,7 +128,7 @@ export class ChronostraSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Summary meta')
-      .setDesc('Show summary text like item, WIP, done, and note counts')
+      .setDesc('Show summary text like item, in-progress, done, and note counts')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.showSummaryMeta)

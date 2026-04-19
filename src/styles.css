@@ -3,6 +3,12 @@
   max-width: none !important;
 }
 
+.chronostra-sticky-overflow-reset {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+}
+
 .chronostra-container {
   /* Scope — monochrome, differentiated by weight & size */
   --chronostra-bg-category: var(--background-primary);

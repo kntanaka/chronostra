@@ -22,38 +22,21 @@ import type { FlatItem, ChronoData } from './types';
  * while our UI is mounted (the JSON is replaced by the table, so no horizontal scroll needed).
  */
 function fixAncestorsForStickyToolbar(host: HTMLElement): () => void {
-  const snapshots: {
-    el: HTMLElement;
-    overflow: string;
-    overflowX: string;
-    overflowY: string;
-  }[] = [];
+  const adjusted: HTMLElement[] = [];
 
   let p: HTMLElement | null = host.parentElement;
   while (p) {
     const tag = p.tagName;
-    if (tag === 'PRE' || tag === 'CODE') {
-      snapshots.push({
-        el: p,
-        overflow: p.style.overflow,
-        overflowX: p.style.overflowX,
-        overflowY: p.style.overflowY,
-      });
-      p.style.setProperty('overflow', 'visible', 'important');
-      p.style.setProperty('overflow-x', 'visible', 'important');
-      p.style.setProperty('overflow-y', 'visible', 'important');
+    if ((tag === 'PRE' || tag === 'CODE') && !p.classList.contains('chronostra-sticky-overflow-reset')) {
+      p.addClass('chronostra-sticky-overflow-reset');
+      adjusted.push(p);
     }
     p = p.parentElement;
   }
 
   return () => {
-    for (const { el, overflow, overflowX, overflowY } of snapshots) {
-      el.style.removeProperty('overflow');
-      el.style.removeProperty('overflow-x');
-      el.style.removeProperty('overflow-y');
-      if (overflow) el.style.overflow = overflow;
-      if (overflowX) el.style.overflowX = overflowX;
-      if (overflowY) el.style.overflowY = overflowY;
+    for (const el of adjusted) {
+      el.removeClass('chronostra-sticky-overflow-reset');
     }
   };
 }
