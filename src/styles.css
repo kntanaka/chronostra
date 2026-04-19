@@ -22,6 +22,10 @@
   --chronostra-menu-bg: var(--background-primary);
   --chronostra-menu-border: var(--background-modifier-border);
   --chronostra-menu-shadow: none;
+  --chronostra-editor-bg: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary));
+  --chronostra-editor-border: color-mix(in srgb, var(--background-modifier-border-hover, var(--background-modifier-border)) 72%, transparent);
+  --chronostra-editor-ring: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  --chronostra-editor-radius: 6px;
 
   /* Layout */
   --chronostra-col-timeline-w: 100px;

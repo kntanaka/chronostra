@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import type { FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
@@ -36,6 +37,7 @@
 
   let editing = $state(false);
   let editValue = $state('');
+  let inputEl = $state<HTMLInputElement | null>(null);
 
   $effect(() => {
     if (autoEdit && onlabelchange && !editing) {
@@ -46,9 +48,16 @@
   });
 
   function startEdit() {
-    if (!onlabelchange) return;
+    if (!onlabelchange || editing) return;
     editing = true;
     editValue = row.label;
+    void focusInput();
+  }
+
+  async function focusInput() {
+    await tick();
+    inputEl?.focus();
+    inputEl?.select();
   }
 
   function commitEdit() {
@@ -64,6 +73,14 @@
       commitEdit();
     } else if (e.key === 'Escape') {
       editing = false;
+    }
+  }
+
+  function handleStartEditKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startEdit();
     }
   }
 </script>
@@ -101,18 +118,20 @@
         class="label-input"
         type="text"
         bind:value={editValue}
+        bind:this={inputEl}
         onblur={commitEdit}
         onkeydown={handleKeydown}
-        autofocus
       />
     {:else}
       <div class="label-line">
-        <span
+        <button
+          type="button"
           class="label"
           class:editable={!!onlabelchange}
           title={row.label}
-          ondblclick={startEdit}
-        >{row.label}</span>
+          onclick={startEdit}
+          onkeydown={handleStartEditKeydown}
+        >{row.label}</button>
         {#if onnoteclick}
           <button
             class="note-link"
@@ -180,10 +199,23 @@
     flex-shrink: 0;
   }
   .label {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    margin: 0;
+    padding: 0;
+    width: 100%;
     min-width: 0;
     white-space: normal;
     word-break: break-word;
     line-height: 1.4;
+    color: inherit;
+    font: inherit;
+    text-align: left;
   }
   .label-stack {
     min-width: 0;
@@ -207,6 +239,10 @@
     text-decoration: underline;
     text-decoration-style: dotted;
     text-underline-offset: 2px;
+  }
+  .label:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
   }
   .note-link {
     appearance: none;
@@ -251,14 +287,24 @@
     flex: 1;
     min-width: 0;
     height: calc(var(--chronostra-row-height) - 12px);
+    box-sizing: border-box;
+    appearance: none !important;
+    -webkit-appearance: none !important;
     font-size: inherit;
     font-weight: inherit;
     font-family: inherit;
+    line-height: 1.35;
     color: var(--text-normal);
-    background: var(--background-primary);
-    border: 1px solid var(--interactive-accent);
-    border-radius: 3px;
-    padding: 0 4px;
-    outline: none;
+    background: var(--chronostra-editor-bg) !important;
+    border: 1px solid var(--chronostra-editor-border) !important;
+    border-radius: var(--chronostra-editor-radius) !important;
+    box-shadow: none !important;
+    padding: 0 8px !important;
+    outline: none !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  }
+  .label-input:focus {
+    border-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--chronostra-editor-border)) !important;
+    box-shadow: 0 0 0 2px var(--chronostra-editor-ring) !important;
   }
 </style>

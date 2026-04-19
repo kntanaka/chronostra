@@ -48,6 +48,14 @@ When in doubt, copy the row context menu styling exactly rather than inventing a
 
 If a new menu-like surface looks more like a modern floating card than an Obsidian menu, it is wrong for this project.
 
+## PR Review Reference
+
+If asked to check PR comments, review feedback, or bot remarks for this project, start from this pull request unless the user provides a different PR:
+
+- `https://github.com/obsidianmd/obsidian-releases/pull/11269`
+
+Treat that PR as the default review context for comment-follow-up work.
+
 ## Product Ideas On Hold
 
 ### Obsidian-Embedded Codex Terminal
