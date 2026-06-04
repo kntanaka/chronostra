@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activeDocument, activeWindow } from 'obsidian';
   import { tick } from 'svelte';
   import type { CellColumnKey, CellNavigationDirection, ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
   import { effectiveScope, MAX_DEPTH } from '../types';
@@ -481,7 +482,7 @@
     data = { ...data };
     onDataChange?.(data);
     saveIndicator = true;
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       saveIndicator = false;
     }, 800);
   }
@@ -915,12 +916,12 @@
       '--ghost-left': `${rect.left}px`,
       '--ghost-top': `${rect.top}px`,
     });
-    document.body.appendChild(clone);
+    activeDocument.body.appendChild(clone);
     dragGhost = clone;
   }
 
   function startAutoScroll(clientY: number) {
-    cancelAnimationFrame(autoScrollRaf);
+    activeWindow.cancelAnimationFrame(autoScrollRaf);
     if (!scrollContainer) return;
 
     const rect = scrollContainer.getBoundingClientRect();
@@ -938,9 +939,9 @@
       const scroll = () => {
         if (!scrollContainer || !dragState) return;
         scrollContainer.scrollTop += speed;
-        autoScrollRaf = requestAnimationFrame(scroll);
+        autoScrollRaf = activeWindow.requestAnimationFrame(scroll);
       };
-      autoScrollRaf = requestAnimationFrame(scroll);
+      autoScrollRaf = activeWindow.requestAnimationFrame(scroll);
     }
   }
 
@@ -1005,7 +1006,7 @@
       dragGhost.remove();
       dragGhost = null;
     }
-    cancelAnimationFrame(autoScrollRaf);
+    activeWindow.cancelAnimationFrame(autoScrollRaf);
   }
 
   function handleDragEnd() {
@@ -1027,7 +1028,7 @@
     if (draggedId === targetId) return;
 
     lastDropTargetId = targetId;
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       lastDropTargetId = null;
     }, 400);
 

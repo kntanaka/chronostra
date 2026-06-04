@@ -161,7 +161,7 @@ export default class ChronostraPlugin extends Plugin {
           ancestor.addClass('chronostra-full-width');
           break;
         }
-        const computed = getComputedStyle(ancestor);
+        const computed = activeWindow.getComputedStyle(ancestor);
         const mw = parseInt(computed.maxWidth);
         if (mw > 0 && mw < 2000) {
           ancestor.addClass('chronostra-full-width');

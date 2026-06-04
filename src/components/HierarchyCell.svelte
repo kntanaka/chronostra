@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activeDocument, activeWindow } from 'obsidian';
   import { tick } from 'svelte';
   import type { CellNavigationDirection, FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
@@ -73,8 +74,8 @@
 
   function getFixedAnchorRect(el: HTMLElement): DOMRect {
     let current: HTMLElement | null = el.parentElement;
-    while (current && current !== document.body) {
-      const style = getComputedStyle(current);
+    while (current && current !== activeDocument.body) {
+      const style = activeWindow.getComputedStyle(current);
       const createsContainingBlock =
         style.transform !== 'none' ||
         style.perspective !== 'none' ||
@@ -102,13 +103,13 @@
 
   function resizeEditor() {
     if (!inputEl) return;
-    inputEl.style.height = '0px';
-    inputEl.style.height = `${Math.max(inputEl.scrollHeight, 72)}px`;
+    inputEl.setCssProps({ '--chronostra-editor-height': '0px' });
+    inputEl.setCssProps({ '--chronostra-editor-height': `${Math.max(inputEl.scrollHeight, 72)}px` });
   }
 
   function correctEditorPosition() {
     if (!shellEl || !inputEl) return;
-    requestAnimationFrame(() => {
+    activeWindow.requestAnimationFrame(() => {
       if (!shellEl || !inputEl) return;
       const desired = shellEl.getBoundingClientRect();
       const actual = inputEl.getBoundingClientRect();
@@ -417,6 +418,7 @@
   .label-input {
     position: fixed;
     min-height: 72px;
+    height: var(--chronostra-editor-height, auto);
     max-height: 240px;
     box-sizing: border-box;
     appearance: none !important;

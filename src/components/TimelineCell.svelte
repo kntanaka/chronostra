@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activeDocument, activeWindow } from 'obsidian';
   import { tick } from 'svelte';
   import type { CellNavigationDirection, TimelineEntry } from '../types';
 
@@ -29,7 +30,7 @@
   let editorTop = $state(0);
   let editorLeft = $state(0);
   let editorWidth = $state(0);
-  let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
+  let hoverTimeout: ReturnType<typeof activeWindow.setTimeout> | undefined;
 
   const statusColor = $derived(() => {
     if (!entry.status || !entry.text) return 'transparent';
@@ -52,19 +53,19 @@
   function onMouseEnter(e: MouseEvent) {
     if (!entry.text || editing) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    hoverTimeout = setTimeout(() => {
+    hoverTimeout = activeWindow.setTimeout(() => {
       onpopup(entry.text, rect.left, rect.bottom + 4);
     }, 300);
   }
 
   function onMouseLeave() {
-    clearTimeout(hoverTimeout);
+    activeWindow.clearTimeout(hoverTimeout);
     onpopup(null, 0, 0);
   }
 
   function startEdit() {
     if (!onchange || editing) return;
-    clearTimeout(hoverTimeout);
+    activeWindow.clearTimeout(hoverTimeout);
     onpopup(null, 0, 0);
     updateEditorFrame();
     editing = true;
@@ -83,8 +84,8 @@
 
   function getFixedAnchorRect(el: HTMLElement): DOMRect {
     let current: HTMLElement | null = el.parentElement;
-    while (current && current !== document.body) {
-      const style = getComputedStyle(current);
+    while (current && current !== activeDocument.body) {
+      const style = activeWindow.getComputedStyle(current);
       const createsContainingBlock =
         style.transform !== 'none' ||
         style.perspective !== 'none' ||
@@ -112,13 +113,13 @@
 
   function resizeEditor() {
     if (!inputEl) return;
-    inputEl.style.height = '0px';
-    inputEl.style.height = `${Math.max(inputEl.scrollHeight, 72)}px`;
+    inputEl.setCssProps({ '--chronostra-editor-height': '0px' });
+    inputEl.setCssProps({ '--chronostra-editor-height': `${Math.max(inputEl.scrollHeight, 72)}px` });
   }
 
   function correctEditorPosition() {
     if (!shellEl || !inputEl) return;
-    requestAnimationFrame(() => {
+    activeWindow.requestAnimationFrame(() => {
       if (!shellEl || !inputEl) return;
       const desired = shellEl.getBoundingClientRect();
       const actual = inputEl.getBoundingClientRect();
@@ -309,6 +310,7 @@
   .timeline-input {
     position: fixed;
     min-height: 72px;
+    height: var(--chronostra-editor-height, auto);
     max-height: 220px;
     box-sizing: border-box;
     appearance: none !important;
