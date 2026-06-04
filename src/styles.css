@@ -9,6 +9,14 @@
   overflow-y: visible !important;
 }
 
+.chronostra-sticky-containing-block-reset {
+  contain: none !important;
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  overflow: visible !important;
+}
+
 .chronostra-container {
   /* Scope — monochrome, differentiated by weight & size */
   --chronostra-bg-category: var(--background-primary);
@@ -32,11 +40,12 @@
   --chronostra-editor-border: color-mix(in srgb, var(--background-modifier-border-hover, var(--background-modifier-border)) 72%, transparent);
   --chronostra-editor-ring: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
   --chronostra-editor-radius: 6px;
+  --chronostra-sticky-top: 0px;
 
   /* Layout */
-  --chronostra-col-timeline-w: 100px;
+  --chronostra-col-timeline-w: 88px;
   --chronostra-row-height: 32px;
-  --chronostra-body-row-height: 64px;
+  --chronostra-body-row-height: 58px;
 
   width: 100%;
   min-height: 80vh;

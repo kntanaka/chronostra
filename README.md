@@ -110,16 +110,13 @@ Notes:
 
 ## Installation
 
-1. Clone or download this repository
-2. Run `npm install` and `npm run build`
-3. Copy `dist/main.js`, `dist/styles.css`, and `dist/manifest.json` to your vault's `.obsidian/plugins/chronostra/` directory
-4. Enable the plugin in Obsidian Settings → Community Plugins
-
-Or symlink for development:
-
-```sh
-ln -s /path/to/chronostra/dist /path/to/vault/.obsidian/plugins/chronostra
-```
+1. Clone this repository and run `npm install` && `npm run build`
+2. Install into your vault (pick one):
+   - **Symlink (development):** `OBSIDIAN_VAULT=/path/to/vault npm run link:vault`
+   - **Manual:** copy the entire `dist/` folder to `.obsidian/plugins/chronostra/` (must contain `main.js`, `styles.css`, `manifest.json`)
+3. In Obsidian: **Settings → Community plugins → Enable Chronostra**
+4. Copy `examples/Future plan.md` into your vault (or set **Settings → Chronostra → Target file** to your own note with a `future-data` block)
+5. Open the table: ribbon **table** icon, command palette **Open Chronostra**, or embed inline by opening a note that contains a `future-data` code block
 
 ## Development
 

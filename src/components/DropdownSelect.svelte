@@ -17,7 +17,7 @@
     value: string;
     options: DropdownOption[];
     placeholder?: string;
-    variant?: 'toolbar' | 'cell';
+    variant?: 'toolbar' | 'cell' | 'mobile';
     disabled?: boolean;
     minWidth?: number;
     title?: string;
@@ -86,7 +86,7 @@
   </button>
 
   {#if open}
-    <div class="context-menu dropdown-menu" onpointerdown={(e) => e.stopPropagation()}>
+    <div class="context-menu dropdown-menu" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
       {#each options as option}
         <button
           type="button"
@@ -134,6 +134,15 @@
     letter-spacing: 0.06em;
     color: var(--text-faint);
     border-color: var(--background-modifier-border);
+  }
+  .mobile .dropdown-trigger {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    border-color: var(--background-modifier-border);
+    border-radius: 6px;
   }
   .cell .dropdown-trigger {
     height: calc(var(--chronostra-row-height) - 10px);

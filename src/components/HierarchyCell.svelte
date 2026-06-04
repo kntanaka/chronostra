@@ -186,9 +186,11 @@
 
 <div class="hierarchy-cell" style:padding-left="{row.depth * 20 + 8}px" style:min-width="{width}px" style:max-width="{width}px" bind:this={shellEl}>
   {#if ondragstart}
-    <span
+    <button
+      type="button"
       class="drag-handle"
       class:dragging={isDragging}
+      aria-label="Drag row"
       onpointerdown={(e) => { e.preventDefault(); ondragstart(e); }}
     >
       <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
@@ -196,7 +198,7 @@
         <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
         <circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/>
       </svg>
-    </span>
+    </button>
   {/if}
   {#each Array(row.depth) as _, i}
     <div
@@ -271,11 +273,20 @@
     padding-bottom: 4px;
   }
   .drag-handle {
+    appearance: none;
+    -webkit-appearance: none;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 14px;
+    min-width: 14px;
+    height: 24px;
     flex-shrink: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
     cursor: grab;
     color: transparent;
     transition: color 0.1s;

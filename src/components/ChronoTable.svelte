@@ -9,6 +9,7 @@
   import TableRow from './TableRow.svelte';
   import CellPopup from './CellPopup.svelte';
   import DropdownSelect from './DropdownSelect.svelte';
+  import MobileChronoList from './MobileChronoList.svelte';
 
   type StatusFilter = 'all' | ItemStatus;
   type ScopeFilter = 'all' | 'category' | Scope;
@@ -137,10 +138,36 @@
     }) => Promise<string | null>;
   } = $props();
 
-  let timelineDisplay = $state<TimelineDisplay>(initialTimelineDisplay);
-  let timelineStartYear = $state(initialTimelineStartYear);
-  let timelineEndYear = $state(initialTimelineEndYear);
-  let showBorders = $state(initialShowRowBorders);
+  function getInitialTimelineDisplay() {
+    return initialTimelineDisplay;
+  }
+
+  function getInitialTimelineStartYear() {
+    return initialTimelineStartYear;
+  }
+
+  function getInitialTimelineEndYear() {
+    return initialTimelineEndYear;
+  }
+
+  function getInitialShowRowBorders() {
+    return initialShowRowBorders;
+  }
+
+  function getInitialData() {
+    return structuredClone(initialData);
+  }
+
+  function getInitialExpandedIds() {
+    return initialExpandedIds.length > 0
+      ? initialExpandedIds
+      : initialData.categories.map((c) => c.id);
+  }
+
+  let timelineDisplay = $state<TimelineDisplay>(getInitialTimelineDisplay());
+  let timelineStartYear = $state(getInitialTimelineStartYear());
+  let timelineEndYear = $state(getInitialTimelineEndYear());
+  let showBorders = $state(getInitialShowRowBorders());
 
   let searchQuery = $state('');
   let statusFilter = $state<StatusFilter>('all');
@@ -152,14 +179,9 @@
   let showTemplateMenu = $state(false);
 
   // Mutable copy of the data tree
-  let data = $state<ChronoData>(structuredClone(initialData));
+  let data = $state<ChronoData>(getInitialData());
   const treeState = new TreeState();
-
-  if (initialExpandedIds.length > 0) {
-    treeState.expanded = new Set(initialExpandedIds);
-  } else {
-    treeState.expanded = new Set(initialData.categories.map((c) => c.id));
-  }
+  treeState.expanded = new Set(getInitialExpandedIds());
 
   const hasCategorySelection = $derived(selectedCategoryIds.length > 0);
 
@@ -285,6 +307,21 @@
   let wrapperEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
+  let contentWidth = $state(1024);
+  const isMobileLayout = $derived(contentWidth <= 760);
+
+  $effect(() => {
+    if (!wrapperEl) return;
+
+    const updateWidth = () => {
+      contentWidth = wrapperEl?.clientWidth ?? 1024;
+    };
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(wrapperEl);
+    return () => observer.disconnect();
+  });
 
   function handleToggle(id: string) {
     treeState.toggle(id);
@@ -301,9 +338,9 @@
     onExpandChange?.([...treeState.expanded]);
   }
 
-  let hierarchyWidth = $state(320);
-  let metricWidths = $state([200, 200, 200, 100, 100]);
-  let metricFrozen = $state([true, true, true, true, true]);
+  let hierarchyWidth = $state(280);
+  let metricWidths = $state([180, 180, 180, 92, 92]);
+  let metricFrozen = $state([false, false, false, false, false]);
 
   function handleHierarchyResize(width: number) {
     hierarchyWidth = Math.max(150, width);
@@ -1100,104 +1137,214 @@
 
 <div class="chrono-wrapper" class:is-dragging={!!dragState} bind:this={wrapperEl}>
   <div class="sticky-chrome">
-    <div class="toolbar">
-      <span class="title">Chronostra</span>
-      <span class="row-count">{flatRows.length} rows</span>
-      {#if saveIndicator}
-        <span class="save-indicator">Saved</span>
-      {/if}
-      <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
-      <span class="tool-sep">/</span>
-      <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
-      <span class="tool-sep">|</span>
-      <button class="tool-link" onclick={expandAll} title="Expand all">⌄</button>
-      <span class="tool-sep">/</span>
-      <button class="tool-link" onclick={collapseAll} title="Collapse all">&gt;</button>
-      <span class="tool-sep">|</span>
-      <input
-        class="search-input"
-        type="search"
-        placeholder="Search"
-        bind:value={searchQuery}
-      />
-      <DropdownSelect
-        value={statusFilter}
-        options={STATUS_FILTER_OPTIONS}
-        minWidth={116}
-        onchange={(next) => { statusFilter = next as StatusFilter; }}
-      />
-      <DropdownSelect
-        value={scopeFilter}
-        options={SCOPE_FILTER_OPTIONS}
-        minWidth={116}
-        onchange={(next) => { scopeFilter = next as ScopeFilter; }}
-      />
-      <DropdownSelect
-        value={commitmentFilter}
-        options={COMMITMENT_FILTER_OPTIONS}
-        minWidth={110}
-        onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
-      />
-      <DropdownSelect
-        value={noteFilter}
-        options={NOTE_FILTER_OPTIONS}
-        minWidth={112}
-        onchange={(next) => { noteFilter = next as NoteFilter; }}
-      />
-      {#if hasActiveFilters}
-        <button class="tool-link" onclick={resetFilters}>Clear</button>
-        <span class="tool-sep">|</span>
-      {/if}
-      <DropdownSelect
-        value={timelineDisplay}
-        options={TIMELINE_DISPLAY_OPTIONS}
-        minWidth={104}
-        onchange={updateTimelineDisplay}
-      />
-      <div class="range-control">
-        <span>Timeline</span>
-        <input
-          class="range-input"
-          type="number"
-          value={timelineStartYear}
-          onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
-        />
-        <span>to</span>
-        <input
-          class="range-input"
-          type="number"
-          value={timelineEndYear}
-          onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
-        />
-      </div>
-      <div class="toolbar-menu-anchor" onpointerdown={(e) => e.stopPropagation()}>
-        <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
-          Templates
-        </button>
-        {#if showTemplateMenu}
-          <div class="chronostra-menu toolbar-menu" onpointerdown={(e) => e.stopPropagation()}>
-            {#each ROOT_TEMPLATES as template}
-              <button
-                type="button"
-                class="chronostra-menu-item"
-                onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
-              >
-                {template.label}
-              </button>
-            {/each}
+    <div class="toolbar" class:mobile-toolbar={isMobileLayout}>
+      {#if isMobileLayout}
+        <div class="mobile-toolbar-row mobile-toolbar-primary">
+          <div class="mobile-title-stack">
+            <span class="title">Chronostra</span>
+            <span class="row-count">{flatRows.length} rows</span>
           </div>
-        {/if}
-      </div>
-      {#if focusId || hasCategorySelection}
-        <span class="tool-sep">|</span>
-        <button class="tool-link tool-active" onclick={clearFocusSelection}>
-          &larr; All
-        </button>
+          {#if saveIndicator}
+            <span class="save-indicator">Saved</span>
+          {/if}
+          <button class="add-btn" onclick={addCategory}>+ Add</button>
+        </div>
+
+        <input
+          class="search-input"
+          type="search"
+          placeholder="Search"
+          bind:value={searchQuery}
+        />
+
+        <div class="mobile-filter-strip">
+          <DropdownSelect
+            value={statusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            variant="mobile"
+            minWidth={126}
+            onchange={(next) => { statusFilter = next as StatusFilter; }}
+          />
+          <DropdownSelect
+            value={scopeFilter}
+            options={SCOPE_FILTER_OPTIONS}
+            variant="mobile"
+            minWidth={126}
+            onchange={(next) => { scopeFilter = next as ScopeFilter; }}
+          />
+          <DropdownSelect
+            value={commitmentFilter}
+            options={COMMITMENT_FILTER_OPTIONS}
+            variant="mobile"
+            minWidth={118}
+            onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
+          />
+          <DropdownSelect
+            value={noteFilter}
+            options={NOTE_FILTER_OPTIONS}
+            variant="mobile"
+            minWidth={120}
+            onchange={(next) => { noteFilter = next as NoteFilter; }}
+          />
+          {#if hasActiveFilters}
+            <button class="mobile-clear-button" onclick={resetFilters}>Clear</button>
+          {/if}
+        </div>
+
+        <div class="mobile-toolbar-row mobile-toolbar-secondary">
+          <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
+          <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
+          <button class="tool-link" onclick={expandAll} title="Expand all">Expand</button>
+          <button class="tool-link" onclick={collapseAll} title="Collapse all">Collapse</button>
+          {#if focusId || hasCategorySelection}
+            <button class="tool-link tool-active" onclick={clearFocusSelection}>All</button>
+          {/if}
+          <div class="toolbar-menu-anchor" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
+            <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
+              Templates
+            </button>
+            {#if showTemplateMenu}
+              <div class="chronostra-menu toolbar-menu" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
+                {#each ROOT_TEMPLATES as template}
+                  <button
+                    type="button"
+                    class="chronostra-menu-item"
+                    onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
+                  >
+                    {template.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <div class="mobile-toolbar-row mobile-timeline-row">
+          <DropdownSelect
+            value={timelineDisplay}
+            options={TIMELINE_DISPLAY_OPTIONS}
+            variant="mobile"
+            minWidth={118}
+            onchange={updateTimelineDisplay}
+          />
+          <div class="range-control">
+            <span>Timeline</span>
+            <input
+              class="range-input"
+              type="number"
+              value={timelineStartYear}
+              onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
+            />
+            <span>to</span>
+            <input
+              class="range-input"
+              type="number"
+              value={timelineEndYear}
+              onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
+            />
+          </div>
+        </div>
+      {:else}
+        <div class="desktop-toolbar-row desktop-toolbar-primary">
+          <div class="desktop-title-stack">
+            <span class="title">Chronostra</span>
+            <span class="row-count">{flatRows.length} rows</span>
+            {#if saveIndicator}
+              <span class="save-indicator">Saved</span>
+            {/if}
+          </div>
+          <div class="desktop-action-group">
+            <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
+            <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
+            <button class="tool-link" onclick={expandAll} title="Expand all">Expand</button>
+            <button class="tool-link" onclick={collapseAll} title="Collapse all">Collapse</button>
+            {#if focusId || hasCategorySelection}
+              <button class="tool-link tool-active" onclick={clearFocusSelection}>All rows</button>
+            {/if}
+          </div>
+          <button class="add-btn" onclick={addCategory}>+ Add category</button>
+        </div>
+
+        <div class="desktop-toolbar-row desktop-toolbar-filters">
+          <input
+            class="search-input"
+            type="search"
+            placeholder="Search"
+            bind:value={searchQuery}
+          />
+          <DropdownSelect
+            value={statusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            minWidth={116}
+            onchange={(next) => { statusFilter = next as StatusFilter; }}
+          />
+          <DropdownSelect
+            value={scopeFilter}
+            options={SCOPE_FILTER_OPTIONS}
+            minWidth={116}
+            onchange={(next) => { scopeFilter = next as ScopeFilter; }}
+          />
+          <DropdownSelect
+            value={commitmentFilter}
+            options={COMMITMENT_FILTER_OPTIONS}
+            minWidth={110}
+            onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
+          />
+          <DropdownSelect
+            value={noteFilter}
+            options={NOTE_FILTER_OPTIONS}
+            minWidth={112}
+            onchange={(next) => { noteFilter = next as NoteFilter; }}
+          />
+          {#if hasActiveFilters}
+            <button class="tool-link" onclick={resetFilters}>Clear</button>
+          {/if}
+          <div class="desktop-toolbar-spacer"></div>
+          <DropdownSelect
+            value={timelineDisplay}
+            options={TIMELINE_DISPLAY_OPTIONS}
+            minWidth={104}
+            onchange={updateTimelineDisplay}
+          />
+          <div class="range-control">
+            <span>Timeline</span>
+            <input
+              class="range-input"
+              type="number"
+              value={timelineStartYear}
+              onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
+            />
+            <span>to</span>
+            <input
+              class="range-input"
+              type="number"
+              value={timelineEndYear}
+              onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
+            />
+          </div>
+          <div class="toolbar-menu-anchor" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
+            <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
+              Templates
+            </button>
+            {#if showTemplateMenu}
+              <div class="chronostra-menu toolbar-menu" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
+                {#each ROOT_TEMPLATES as template}
+                  <button
+                    type="button"
+                    class="chronostra-menu-item"
+                    onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
+                  >
+                    {template.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </div>
       {/if}
-      <button class="add-btn" onclick={addCategory}>+ Add category</button>
     </div>
 
-    {#if overviewRows.length > 0}
+    {#if !isMobileLayout && overviewRows.length > 0}
       <div class="overview-strip">
         {#each overviewRows as row (row.id)}
           <button
@@ -1221,145 +1368,169 @@
     {/if}
   </div>
 
-  <div
-    class="scroll-container"
-    bind:this={scrollContainer}
-    onscroll={handleScroll}
-  >
-    <TableHeader
-      {hierarchyWidth}
-      {metricWidths}
-      {metricFrozen}
-      {focusYear}
-      {timelineDisplay}
-      {birthYear}
+  {#if isMobileLayout}
+    <MobileChronoList
+      rows={flatRows}
+      {showSummaryMeta}
       {timelineStartYear}
       {timelineEndYear}
-      onhierarchyresize={handleHierarchyResize}
-      onresize={handleMetricResize}
-      ontogglefreeze={handleToggleFreeze}
-      onfocusyear={(y) => { focusYear = y; }}
+      ontoggle={handleToggle}
+      onlabelchange={handleLabelChange}
+      onmetricchange={handleMetricChange}
+      onstatuschange={handleStatusChange}
+      oncommitmentchange={handleCommitmentChange}
+      ontimelinechange={handleTimelineChange}
+      onaddchild={addChild}
+      onaddsibling={addSibling}
+      onduplicate={duplicateRow}
+      ondelete={deleteRow}
+      onfocus={(id) => { selectedCategoryIds = []; focusId = id; }}
+      onnoteclick={(id) => { void handleNoteClick(id); }}
+      onunlinknote={unlinkNote}
     />
-
+  {:else}
     <div
-      class="row-list"
-      class:no-borders={!showBorders}
-      bind:this={rowListEl}
-      style:width="max-content"
-      style:min-width="100%"
+      class="scroll-container"
+      bind:this={scrollContainer}
+      onscroll={handleScroll}
     >
-      {#each flatRows as row (row.id)}
-        <div
-          class="row-wrapper"
-          class:active-layer={activeRowId === row.id}
-          onpointerdown={() => { activeRowId = row.id; }}
-        >
-          <TableRow
-            {row}
-            {hierarchyWidth}
-            {metricWidths}
-            {metricFrozen}
-            {birthYear}
-            {focusYear}
-            {timelineStartYear}
-            {timelineEndYear}
-            {showSummaryMeta}
-            autoEditColumn={pendingEditId === row.id ? pendingEditColumn : null}
-            isDragged={dragState?.draggedId === row.id}
-            isDropTarget={dragState?.targetId === row.id}
-            dropPosition={dragState?.targetId === row.id ? dragState.position : undefined}
-            justDropped={lastDropTargetId === row.id}
-            ontoggle={handleToggle}
-            onpopup={handlePopup}
-            onmetricchange={handleMetricChange}
-            onstatuschange={handleStatusChange}
-            onlabelchange={handleLabelChange}
-            ontimelinechange={handleTimelineChange}
-            onrowcontextmenu={handleRowContextMenu}
-            onautoedited={clearEditTarget}
-            ondragstart={handleDragStart}
-            onnoteclick={handleNoteClick}
-            oncommitmentchange={handleCommitmentChange}
-            onnavigate={handleCellNavigate}
-          />
-        </div>
-      {/each}
-      {#if flatRows.length === 0}
-        <div class="empty-state">No rows match the current filters.</div>
-      {/if}
-    </div>
+      <TableHeader
+        {hierarchyWidth}
+        {metricWidths}
+        {metricFrozen}
+        {focusYear}
+        {timelineDisplay}
+        {birthYear}
+        {timelineStartYear}
+        {timelineEndYear}
+        onhierarchyresize={handleHierarchyResize}
+        onresize={handleMetricResize}
+        ontogglefreeze={handleToggleFreeze}
+        onfocusyear={(y) => { focusYear = y; }}
+      />
 
-    {#if rowMenu}
       <div
-        class="row-context-menu"
-        style:left="{rowMenu.x}px"
-        style:top="{rowMenu.y}px"
-        onpointerdown={(e) => e.stopPropagation()}
+        class="row-list"
+        class:no-borders={!showBorders}
+        bind:this={rowListEl}
+        style:width="max-content"
+        style:min-width="100%"
       >
-        <button type="button" class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
-          + Add child
-        </button>
-        <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
-          + Add sibling
-        </button>
-        <button type="button" class="context-item" onclick={() => { duplicateRow(rowMenu!.id); closeRowMenu(); }}>
-          Duplicate subtree
-        </button>
-        <button type="button" class="context-item" onclick={() => { insertStarterChain(rowMenu!.id); closeRowMenu(); }}>
-          Insert starter chain
-        </button>
-        {#if (findNode(data.categories, rowMenu.id)?.depth ?? 0) > 0}
-          {@const menuNode = findNode(data.categories, rowMenu.id)}
-          <div class="context-divider"></div>
-          <div class="context-section-label">Scope</div>
-          <button
-            type="button"
-            class="context-item"
-            class:context-item-active={menuNode?.scope === 'vision'}
-            onclick={() => { handleScopeChange(rowMenu!.id, 'vision'); closeRowMenu(); }}
+        {#each flatRows as row (row.id)}
+          <div
+            class="row-wrapper"
+            class:active-layer={activeRowId === row.id}
+            role="presentation"
+            onpointerdown={() => { activeRowId = row.id; }}
           >
-            Set as vision
+            <TableRow
+              {row}
+              {hierarchyWidth}
+              {metricWidths}
+              {metricFrozen}
+              {birthYear}
+              {focusYear}
+              {timelineStartYear}
+              {timelineEndYear}
+              {showSummaryMeta}
+              autoEditColumn={pendingEditId === row.id ? pendingEditColumn : null}
+              isDragged={dragState?.draggedId === row.id}
+              isDropTarget={dragState?.targetId === row.id}
+              dropPosition={dragState?.targetId === row.id ? dragState.position : undefined}
+              justDropped={lastDropTargetId === row.id}
+              ontoggle={handleToggle}
+              onpopup={handlePopup}
+              onmetricchange={handleMetricChange}
+              onstatuschange={handleStatusChange}
+              onlabelchange={handleLabelChange}
+              ontimelinechange={handleTimelineChange}
+              onrowcontextmenu={handleRowContextMenu}
+              onautoedited={clearEditTarget}
+              ondragstart={handleDragStart}
+              onnoteclick={handleNoteClick}
+              oncommitmentchange={handleCommitmentChange}
+              onnavigate={handleCellNavigate}
+            />
+          </div>
+        {/each}
+        {#if flatRows.length === 0}
+          <div class="empty-state">No rows match the current filters.</div>
+        {/if}
+      </div>
+
+      {#if rowMenu}
+        <div
+          class="row-context-menu"
+          role="presentation"
+          style:left="{rowMenu.x}px"
+          style:top="{rowMenu.y}px"
+          onpointerdown={(e) => e.stopPropagation()}
+        >
+          <button type="button" class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
+            + Add child
           </button>
-          <button
-            type="button"
-            class="context-item"
-            class:context-item-active={menuNode?.scope === 'goal'}
-            onclick={() => { handleScopeChange(rowMenu!.id, 'goal'); closeRowMenu(); }}
-          >
-            Set as goal
+          <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
+            + Add sibling
           </button>
-          <button
-            type="button"
-            class="context-item"
-            class:context-item-active={menuNode?.scope === 'step'}
-            onclick={() => { handleScopeChange(rowMenu!.id, 'step'); closeRowMenu(); }}
-          >
-            Set as step
+          <button type="button" class="context-item" onclick={() => { duplicateRow(rowMenu!.id); closeRowMenu(); }}>
+            Duplicate subtree
           </button>
-          {#if menuNode?.scope}
-            <button type="button" class="context-item" onclick={() => { handleScopeChange(rowMenu!.id, undefined); closeRowMenu(); }}>
-              Reset scope (auto)
+          <button type="button" class="context-item" onclick={() => { insertStarterChain(rowMenu!.id); closeRowMenu(); }}>
+            Insert starter chain
+          </button>
+          {#if (findNode(data.categories, rowMenu.id)?.depth ?? 0) > 0}
+            {@const menuNode = findNode(data.categories, rowMenu.id)}
+            <div class="context-divider"></div>
+            <div class="context-section-label">Scope</div>
+            <button
+              type="button"
+              class="context-item"
+              class:context-item-active={menuNode?.scope === 'vision'}
+              onclick={() => { handleScopeChange(rowMenu!.id, 'vision'); closeRowMenu(); }}
+            >
+              Set as vision
+            </button>
+            <button
+              type="button"
+              class="context-item"
+              class:context-item-active={menuNode?.scope === 'goal'}
+              onclick={() => { handleScopeChange(rowMenu!.id, 'goal'); closeRowMenu(); }}
+            >
+              Set as goal
+            </button>
+            <button
+              type="button"
+              class="context-item"
+              class:context-item-active={menuNode?.scope === 'step'}
+              onclick={() => { handleScopeChange(rowMenu!.id, 'step'); closeRowMenu(); }}
+            >
+              Set as step
+            </button>
+            {#if menuNode?.scope}
+              <button type="button" class="context-item" onclick={() => { handleScopeChange(rowMenu!.id, undefined); closeRowMenu(); }}>
+                Reset scope (auto)
+              </button>
+            {/if}
+            <div class="context-divider"></div>
+          {/if}
+          <button type="button" class="context-item" onclick={() => { void handleNoteClick(rowMenu!.id); closeRowMenu(); }}>
+            {findNode(data.categories, rowMenu.id)?.notePath ? 'Open linked note' : 'Create linked note'}
+          </button>
+          {#if findNode(data.categories, rowMenu.id)?.notePath}
+            <button type="button" class="context-item" onclick={() => { unlinkNote(rowMenu!.id); closeRowMenu(); }}>
+              Remove note link
             </button>
           {/if}
-          <div class="context-divider"></div>
-        {/if}
-        <button type="button" class="context-item" onclick={() => { void handleNoteClick(rowMenu!.id); closeRowMenu(); }}>
-          {findNode(data.categories, rowMenu.id)?.notePath ? 'Open linked note' : 'Create linked note'}
-        </button>
-        {#if findNode(data.categories, rowMenu.id)?.notePath}
-          <button type="button" class="context-item" onclick={() => { unlinkNote(rowMenu!.id); closeRowMenu(); }}>
-            Remove note link
+          <button type="button" class="context-item" onclick={() => { selectedCategoryIds = []; focusId = rowMenu!.id; closeRowMenu(); }}>
+            Focus
           </button>
-        {/if}
-        <button type="button" class="context-item" onclick={() => { selectedCategoryIds = []; focusId = rowMenu!.id; closeRowMenu(); }}>
-          Focus
-        </button>
-        <button type="button" class="context-item danger" onclick={() => { deleteRow(rowMenu!.id); closeRowMenu(); }}>
-          Delete
-        </button>
-      </div>
-    {/if}
-  </div>
+          <button type="button" class="context-item danger" onclick={() => { deleteRow(rowMenu!.id); closeRowMenu(); }}>
+            Delete
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if popupText}
     <CellPopup text={popupText} x={popupX} y={popupY} />
@@ -1374,6 +1545,7 @@
     height: fit-content;
     background: var(--background-primary);
     overflow: visible;
+    position: relative;
   }
   .chrono-wrapper.is-dragging {
     cursor: grabbing;
@@ -1381,8 +1553,8 @@
   }
   .sticky-chrome {
     position: sticky;
-    top: 0;
-    z-index: 40;
+    top: var(--chronostra-sticky-top, 0px);
+    z-index: 900;
     flex-shrink: 0;
     width: 100%;
     box-sizing: border-box;
@@ -1402,6 +1574,80 @@
     flex-shrink: 0;
     background: var(--background-primary);
     pointer-events: auto;
+  }
+  .toolbar:not(.mobile-toolbar) {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .desktop-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .desktop-toolbar-primary {
+    justify-content: space-between;
+  }
+  .desktop-title-stack,
+  .desktop-action-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .desktop-action-group {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .desktop-toolbar-filters {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .desktop-toolbar-spacer {
+    flex: 1 1 16px;
+    min-width: 8px;
+  }
+  .toolbar.mobile-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 12px 12px;
+  }
+  .mobile-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-toolbar-primary {
+    justify-content: space-between;
+  }
+  .mobile-title-stack {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-filter-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .mobile-filter-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-toolbar-secondary {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .mobile-timeline-row {
+    flex-wrap: wrap;
+    color: var(--text-faint);
   }
   .title {
     font-weight: 600;
@@ -1452,6 +1698,22 @@
   .tool-link:hover {
     color: var(--text-normal);
   }
+  .toolbar:not(.mobile-toolbar) .tool-link {
+    min-height: 26px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .toolbar:not(.mobile-toolbar) .tool-link:hover,
+  .toolbar:not(.mobile-toolbar) .tool-link.tool-active {
+    border-color: var(--background-modifier-border-hover, var(--text-faint));
+    color: var(--text-normal);
+    background: var(--background-secondary);
+  }
   .search-input,
   .range-input {
     appearance: none;
@@ -1474,6 +1736,44 @@
   .search-input {
     min-width: 160px;
   }
+  .toolbar:not(.mobile-toolbar) .search-input {
+    width: 220px;
+    max-width: 100%;
+    height: 28px;
+    border-radius: 5px;
+  }
+  .mobile-toolbar .search-input {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+  .mobile-toolbar .tool-link {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .mobile-clear-button {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+  }
   .range-control {
     display: inline-flex;
     align-items: center;
@@ -1487,10 +1787,19 @@
     text-transform: none;
     letter-spacing: normal;
   }
-  .tool-sep {
-    font-size: 10px;
-    color: var(--text-faint);
-    opacity: 0.4;
+  .toolbar:not(.mobile-toolbar) .range-input {
+    height: 28px;
+    border-radius: 5px;
+  }
+  .mobile-toolbar .range-control {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .mobile-toolbar .range-input {
+    width: 88px;
+    height: 36px;
+    border-radius: 6px;
+    font-size: 13px;
   }
   .toolbar-menu-anchor {
     position: relative;
@@ -1512,6 +1821,31 @@
     text-decoration: underline;
     box-shadow: none;
   }
+  .toolbar:not(.mobile-toolbar) .add-btn {
+    flex: 0 0 auto;
+    margin-left: 0;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    color: var(--text-normal);
+    text-decoration: none;
+  }
+  .toolbar:not(.mobile-toolbar) .add-btn:hover {
+    border-color: var(--background-modifier-border-hover, var(--text-faint));
+    background: var(--background-secondary);
+  }
+  .mobile-toolbar .add-btn {
+    flex: 0 0 auto;
+    margin-left: 0;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    color: var(--text-normal);
+    text-decoration: none;
+    font-size: 12px;
+  }
   .add-btn:hover {
     color: var(--text-normal);
   }
@@ -1522,8 +1856,8 @@
   }
   .overview-strip {
     display: flex;
-    gap: 8px;
-    padding: 10px 16px;
+    gap: 6px;
+    padding: 8px 14px;
     overflow-x: auto;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
@@ -1533,16 +1867,16 @@
     appearance: none;
     -webkit-appearance: none;
     font-family: inherit;
-    min-width: 180px;
-    max-width: 240px;
-    min-height: 64px;
+    min-width: 132px;
+    max-width: 190px;
+    min-height: 38px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 8px 0 8px 12px;
-    border: none;
-    border-left: 1px solid var(--background-modifier-border);
-    border-radius: 0;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
     box-shadow: none;
     background: transparent;
     color: var(--text-normal);
@@ -1550,22 +1884,23 @@
     cursor: pointer;
   }
   .overview-card.is-focused {
-    border-left: 2px solid var(--text-normal);
+    border-color: var(--text-normal);
+    background: var(--background-secondary);
   }
   .overview-card.is-dimmed {
     opacity: 0.38;
   }
   .overview-card:hover {
-    border-left-color: var(--text-normal);
+    border-color: var(--text-normal);
     opacity: 1;
   }
   .overview-title {
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: normal;
@@ -1573,7 +1908,7 @@
     line-height: 1.4;
   }
   .overview-meta {
-    font-size: 10px;
+    font-size: 9px;
     color: var(--text-faint);
     line-height: 1.4;
     display: -webkit-box;
@@ -1591,7 +1926,7 @@
     z-index: 0;
   }
   .scroll-container:focus-within {
-    z-index: 80;
+    z-index: 1;
   }
   .row-list {
   }
@@ -1605,7 +1940,7 @@
     z-index: 0;
   }
   .row-wrapper.active-layer {
-    z-index: 60;
+    z-index: 2;
   }
   .empty-state {
     padding: 18px 16px;

@@ -113,6 +113,7 @@
 <div class="table-header">
   <div
     class="header-cell hierarchy-header"
+    role="presentation"
     style:min-width="{hierarchyWidth}px"
     style:max-width="{hierarchyWidth}px"
   >
@@ -120,6 +121,7 @@
     <div
       class="resize-handle"
       class:active={resizing?.target === 'hierarchy'}
+      role="presentation"
       onpointerdown={(e) => onPointerDown(e, 'hierarchy')}
     ></div>
   </div>
@@ -130,6 +132,7 @@
       class="header-cell metric-header"
       class:frozen={offset != null}
       class:timeline-start-divider={i === 4}
+      role="presentation"
       style:left={offset != null ? `${offset}px` : 'auto'}
       style:position={offset != null ? 'sticky' : 'relative'}
       style:min-width="{metricWidths[i]}px"
@@ -143,11 +146,13 @@
       <div
         class="resize-handle"
         class:active={resizing?.target === i}
+        role="presentation"
         onpointerdown={(e) => onPointerDown(e, i)}
       ></div>
       {#if contextMenuIndex === i}
         <div
           class="context-menu"
+          role="presentation"
           onpointerdown={(e) => e.stopPropagation()}
         >
           <button type="button" class="context-item" onclick={handleToggleFreeze}>
@@ -163,6 +168,8 @@
       class="header-cell timeline-header"
       class:year-focused={focusYear === year}
       class:milestone={isMilestone(year)}
+      role="button"
+      tabindex="0"
       ondblclick={() => onfocusyear(focusYear === year ? null : year)}
     >{yearLabel(year)}</div>
   {/each}

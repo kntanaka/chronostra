@@ -112,6 +112,7 @@
   class:just-dropped={justDropped}
   style:background={bgMap[displayKind]}
   style:font-weight={fontWeightMap[displayKind]}
+  role="presentation"
   oncontextmenu={handleContextMenu}
 >
   <div

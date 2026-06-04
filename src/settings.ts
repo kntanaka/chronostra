@@ -38,8 +38,17 @@ export class ChronostraSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
+      .setName('Open Chronostra view')
+      .setDesc('Dedicated table pane (ribbon icon or command palette: Open Chronostra)')
+      .addButton((button) =>
+        button.setButtonText('Open').onClick(() => {
+          void this.plugin.activateView();
+        })
+      );
+
+    new Setting(containerEl)
       .setName('Target file')
-      .setDesc('Path to the Markdown file containing the future-data code block')
+      .setDesc('Markdown file with a future-data code block (see examples/Future plan.md in the repo)')
       .addText((text) =>
         text
           .setPlaceholder('Future plan.md')

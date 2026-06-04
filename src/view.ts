@@ -54,7 +54,9 @@ export class ChronostraView extends ItemView {
 
   onClose() {
     if (this.svelteComponent) {
-      void unmount(this.svelteComponent);
+      void unmount(this.svelteComponent).catch((error: unknown) => {
+        console.error('Chronostra: Failed to unmount view UI', error);
+      });
       this.svelteComponent = null;
     }
   }
@@ -74,16 +76,26 @@ export class ChronostraView extends ItemView {
         sourcePath: this.plugin.settings.targetFilePath,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;
-          void this.plugin.saveSettings();
+          void this.plugin.saveSettings().catch((error: unknown) => {
+            console.error('Chronostra: Failed to save expanded state', error);
+          });
         },
         onEnsureNote: async (payload: {
           notePath?: string;
           sourcePath: string;
           hierarchyPath: string[];
         }) => this.plugin.ensureRowNote(payload),
+        onDataChange: (updatedData: ChronoData) => {
+          this.data = updatedData;
+          void this.dataProvider.save(updatedData).catch((error: unknown) => {
+            console.error('Chronostra: Failed to save view data', error);
+          });
+        },
         onSettingsChange: (key: string, value: unknown) => {
           (this.plugin.settings as Record<string, unknown>)[key] = value;
-          void this.plugin.saveSettings();
+          void this.plugin.saveSettings().catch((error: unknown) => {
+            console.error('Chronostra: Failed to save settings', error);
+          });
         },
       },
     });
@@ -92,7 +104,9 @@ export class ChronostraView extends ItemView {
   private remount() {
     const container = this.containerEl.children[1] as HTMLElement;
     if (this.svelteComponent) {
-      void unmount(this.svelteComponent);
+      void unmount(this.svelteComponent).catch((error: unknown) => {
+        console.error('Chronostra: Failed to unmount view UI before remount', error);
+      });
       this.svelteComponent = null;
     }
     container.empty();

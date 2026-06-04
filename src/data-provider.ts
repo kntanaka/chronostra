@@ -1,4 +1,4 @@
-import { TFile, TAbstractFile } from 'obsidian';
+import { TFile, TAbstractFile, activeWindow } from 'obsidian';
 import type ChronostraPlugin from './main';
 import type { ChronoData } from './types';
 import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
@@ -34,10 +34,14 @@ export class DataProvider {
     }
 
     try {
-      const flatItems: FlatItem[] = JSON.parse(json);
+      const parsed = JSON.parse(json) as unknown;
+      if (!Array.isArray(parsed)) {
+        return { categories: [] };
+      }
+      const flatItems = parsed as FlatItem[];
       return buildTreeFromFlatItems(flatItems);
-    } catch (e) {
-      console.error('Chronostra: Failed to parse future-data JSON', e);
+    } catch (_e) {
+      console.error('Chronostra: Failed to parse future-data JSON', _e);
       return { categories: [] };
     }
   }
@@ -56,7 +60,7 @@ export class DataProvider {
     });
 
     this.lastWriteTime = Date.now();
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       this.isSaving = false;
     }, this.writeDebounceMs);
   }
@@ -73,7 +77,9 @@ export class DataProvider {
     if (this.isSaving) return;
     if (Date.now() - this.lastWriteTime < this.writeDebounceMs) return;
 
-    void this.load().then(onUpdate);
+    void this.load().then(onUpdate).catch((error: unknown) => {
+      console.error('Chronostra: Failed to handle external file change', error);
+    });
   }
 
   private extractFutureDataBlock(content: string): string | null {
