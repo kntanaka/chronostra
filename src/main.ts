@@ -4,8 +4,6 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
-  activeDocument,
-  activeWindow,
   normalizePath,
 } from 'obsidian';
 import { mount, unmount } from 'svelte';
@@ -58,6 +56,10 @@ function fixAncestorsForStickyToolbar(host: HTMLElement): () => void {
       el.removeClass(className);
     }
   };
+}
+
+function getOwnerWindow(el: HTMLElement): Window {
+  return el.ownerDocument.defaultView ?? window;
 }
 
 export default class ChronostraPlugin extends Plugin {
@@ -152,7 +154,8 @@ export default class ChronostraPlugin extends Plugin {
     const data = buildTreeFromFlatItems(flatItems);
 
     // Remove readable line width constraint
-    activeWindow.setTimeout(() => {
+    const ownerWindow = getOwnerWindow(el);
+    ownerWindow.setTimeout(() => {
       let ancestor: HTMLElement | null = el.parentElement;
       while (ancestor) {
         if (ancestor.classList.contains('markdown-preview-sizer') ||
@@ -161,7 +164,7 @@ export default class ChronostraPlugin extends Plugin {
           ancestor.addClass('chronostra-full-width');
           break;
         }
-        const computed = activeWindow.getComputedStyle(ancestor);
+        const computed = ownerWindow.getComputedStyle(ancestor);
         const mw = parseInt(computed.maxWidth);
         if (mw > 0 && mw < 2000) {
           ancestor.addClass('chronostra-full-width');
@@ -227,7 +230,7 @@ export default class ChronostraPlugin extends Plugin {
         observer.disconnect();
       }
     });
-    observer.observe(el.parentElement || activeDocument.body, { childList: true, subtree: true });
+    observer.observe(el.parentElement || el.ownerDocument.body, { childList: true, subtree: true });
   }
 
   /** Write updated data back to the markdown file's future-data code block */

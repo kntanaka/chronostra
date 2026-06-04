@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { activeDocument, activeWindow } from 'obsidian';
   import { tick } from 'svelte';
   import type { CellNavigationDirection, TimelineEntry } from '../types';
 
@@ -30,7 +29,11 @@
   let editorTop = $state(0);
   let editorLeft = $state(0);
   let editorWidth = $state(0);
-  let hoverTimeout: ReturnType<typeof activeWindow.setTimeout> | undefined;
+  let hoverTimeout: ReturnType<Window['setTimeout']> | undefined;
+
+  function getOwnerWindow(el?: HTMLElement | null): Window {
+    return el?.ownerDocument.defaultView ?? window;
+  }
 
   const statusColor = $derived(() => {
     if (!entry.status || !entry.text) return 'transparent';
@@ -53,19 +56,19 @@
   function onMouseEnter(e: MouseEvent) {
     if (!entry.text || editing) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    hoverTimeout = activeWindow.setTimeout(() => {
+    hoverTimeout = getOwnerWindow(e.currentTarget as HTMLElement).setTimeout(() => {
       onpopup(entry.text, rect.left, rect.bottom + 4);
     }, 300);
   }
 
   function onMouseLeave() {
-    activeWindow.clearTimeout(hoverTimeout);
+    getOwnerWindow(shellEl).clearTimeout(hoverTimeout);
     onpopup(null, 0, 0);
   }
 
   function startEdit() {
     if (!onchange || editing) return;
-    activeWindow.clearTimeout(hoverTimeout);
+    getOwnerWindow(shellEl).clearTimeout(hoverTimeout);
     onpopup(null, 0, 0);
     updateEditorFrame();
     editing = true;
@@ -84,8 +87,9 @@
 
   function getFixedAnchorRect(el: HTMLElement): DOMRect {
     let current: HTMLElement | null = el.parentElement;
-    while (current && current !== activeDocument.body) {
-      const style = activeWindow.getComputedStyle(current);
+    const ownerWindow = getOwnerWindow(el);
+    while (current && current !== el.ownerDocument.body) {
+      const style = ownerWindow.getComputedStyle(current);
       const createsContainingBlock =
         style.transform !== 'none' ||
         style.perspective !== 'none' ||
@@ -119,7 +123,7 @@
 
   function correctEditorPosition() {
     if (!shellEl || !inputEl) return;
-    activeWindow.requestAnimationFrame(() => {
+    getOwnerWindow(shellEl).requestAnimationFrame(() => {
       if (!shellEl || !inputEl) return;
       const desired = shellEl.getBoundingClientRect();
       const actual = inputEl.getBoundingClientRect();

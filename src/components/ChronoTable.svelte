@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { activeDocument, activeWindow } from 'obsidian';
   import { tick } from 'svelte';
   import type { CellColumnKey, CellNavigationDirection, ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
   import { effectiveScope, MAX_DEPTH } from '../types';
@@ -104,6 +103,10 @@
       ],
     },
   ];
+
+  function getOwnerWindow(el?: HTMLElement | null): Window {
+    return el?.ownerDocument.defaultView ?? window;
+  }
 
   let {
     data: initialData,
@@ -482,7 +485,7 @@
     data = { ...data };
     onDataChange?.(data);
     saveIndicator = true;
-    activeWindow.setTimeout(() => {
+    getOwnerWindow(wrapperEl).setTimeout(() => {
       saveIndicator = false;
     }, 800);
   }
@@ -916,12 +919,13 @@
       '--ghost-left': `${rect.left}px`,
       '--ghost-top': `${rect.top}px`,
     });
-    activeDocument.body.appendChild(clone);
+    rowEl.ownerDocument.body.appendChild(clone);
     dragGhost = clone;
   }
 
   function startAutoScroll(clientY: number) {
-    activeWindow.cancelAnimationFrame(autoScrollRaf);
+    const ownerWindow = getOwnerWindow(scrollContainer);
+    ownerWindow.cancelAnimationFrame(autoScrollRaf);
     if (!scrollContainer) return;
 
     const rect = scrollContainer.getBoundingClientRect();
@@ -939,9 +943,9 @@
       const scroll = () => {
         if (!scrollContainer || !dragState) return;
         scrollContainer.scrollTop += speed;
-        autoScrollRaf = activeWindow.requestAnimationFrame(scroll);
+        autoScrollRaf = ownerWindow.requestAnimationFrame(scroll);
       };
-      autoScrollRaf = activeWindow.requestAnimationFrame(scroll);
+      autoScrollRaf = ownerWindow.requestAnimationFrame(scroll);
     }
   }
 
@@ -1006,7 +1010,7 @@
       dragGhost.remove();
       dragGhost = null;
     }
-    activeWindow.cancelAnimationFrame(autoScrollRaf);
+    getOwnerWindow(scrollContainer).cancelAnimationFrame(autoScrollRaf);
   }
 
   function handleDragEnd() {
@@ -1028,7 +1032,7 @@
     if (draggedId === targetId) return;
 
     lastDropTargetId = targetId;
-    activeWindow.setTimeout(() => {
+    getOwnerWindow(scrollContainer).setTimeout(() => {
       lastDropTargetId = null;
     }, 400);
 

@@ -1,4 +1,4 @@
-import { TFile, TAbstractFile, activeWindow } from 'obsidian';
+import { TFile, TAbstractFile } from 'obsidian';
 import type ChronostraPlugin from './main';
 import type { ChronoData } from './types';
 import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
@@ -60,7 +60,7 @@ export class DataProvider {
     });
 
     this.lastWriteTime = Date.now();
-    activeWindow.setTimeout(() => {
+    (window.activeWindow ?? window).setTimeout(() => {
       this.isSaving = false;
     }, this.writeDebounceMs);
   }

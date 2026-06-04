@@ -15,7 +15,7 @@ export interface ChronostraSettings {
 }
 
 export const DEFAULT_SETTINGS: ChronostraSettings = {
-  targetFilePath: 'Future plan.md',
+  targetFilePath: 'Future Plan.md',
   expandedIds: [],
   birthDate: '',
   timelineDisplay: 'year',
@@ -51,7 +51,7 @@ export class ChronostraSettingTab extends PluginSettingTab {
       .setDesc('Markdown file with a future-data code block (see examples/Future plan.md in the repo)')
       .addText((text) =>
         text
-          .setPlaceholder('Future plan.md')
+          .setPlaceholder('Future Plan.md')
           .setValue(this.plugin.settings.targetFilePath)
           .onChange(async (value) => {
             this.plugin.settings.targetFilePath = value;
