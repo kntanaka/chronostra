@@ -42,7 +42,9 @@ export class ChronostraSettingTab extends PluginSettingTab {
       .setDesc('Dedicated table pane (ribbon icon or command palette: Open Chronostra)')
       .addButton((button) =>
         button.setButtonText('Open').onClick(() => {
-          void this.plugin.activateView();
+          void this.plugin.activateView().catch((error: unknown) => {
+            console.error('Chronostra: Failed to activate view from settings', error);
+          });
         })
       );
 

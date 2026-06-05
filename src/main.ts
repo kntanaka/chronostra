@@ -12,6 +12,7 @@ import {
   type ChronostraSettings,
   DEFAULT_SETTINGS,
   ChronostraSettingTab,
+  type TimelineDisplay,
 } from './settings';
 import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
 import type { FlatItem, ChronoData } from './types';
@@ -62,6 +63,44 @@ function getOwnerWindow(el: HTMLElement): Window {
   return el.ownerDocument.defaultView ?? window;
 }
 
+function readString(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function readNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function readTimelineDisplay(value: unknown, fallback: TimelineDisplay): TimelineDisplay {
+  return value === 'year' || value === 'age' || value === 'both' ? value : fallback;
+}
+
+function readStringArray(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.every((item): item is string => typeof item === 'string')
+    ? value
+    : fallback;
+}
+
+function normalizeSettings(raw: unknown): ChronostraSettings {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
+  const settings = raw as Record<string, unknown>;
+
+  return {
+    targetFilePath: readString(settings.targetFilePath, DEFAULT_SETTINGS.targetFilePath),
+    expandedIds: readStringArray(settings.expandedIds, DEFAULT_SETTINGS.expandedIds),
+    birthDate: readString(settings.birthDate, DEFAULT_SETTINGS.birthDate),
+    timelineDisplay: readTimelineDisplay(settings.timelineDisplay, DEFAULT_SETTINGS.timelineDisplay),
+    timelineStartYear: readNumber(settings.timelineStartYear, DEFAULT_SETTINGS.timelineStartYear),
+    timelineEndYear: readNumber(settings.timelineEndYear, DEFAULT_SETTINGS.timelineEndYear),
+    showRowBorders: readBoolean(settings.showRowBorders, DEFAULT_SETTINGS.showRowBorders),
+    showSummaryMeta: readBoolean(settings.showSummaryMeta, DEFAULT_SETTINGS.showSummaryMeta),
+  };
+}
+
 export default class ChronostraPlugin extends Plugin {
   settings: ChronostraSettings = DEFAULT_SETTINGS;
   private svelteInstances = new Map<
@@ -83,8 +122,8 @@ export default class ChronostraPlugin extends Plugin {
       });
 
       this.addCommand({
-        id: 'open-chronostra',
-        name: 'Open Chronostra',
+        id: 'open',
+        name: 'Open',
         callback: () => {
           void this.activateView().catch((error: unknown) => {
             console.error('Chronostra: Failed to activate view from command', error);
@@ -115,7 +154,7 @@ export default class ChronostraPlugin extends Plugin {
       await leaf.setViewState({ type: VIEW_TYPE_CHRONOSTRA, active: true });
     }
 
-    workspace.revealLeaf(leaf);
+    workspace.setActiveLeaf(leaf, { focus: true });
   }
 
   onunload() {
@@ -133,7 +172,7 @@ export default class ChronostraPlugin extends Plugin {
     let parsed: unknown;
     try {
       parsed = JSON.parse(source) as unknown;
-    } catch (_e) {
+    } catch {
       el.createDiv({
         text: 'Chronostra: invalid JSON in future-data block',
         cls: 'chronostra-error',
@@ -248,7 +287,8 @@ export default class ChronostraPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const rawSettings: unknown = await this.loadData();
+    this.settings = normalizeSettings(rawSettings);
   }
 
   async saveSettings() {
