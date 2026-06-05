@@ -87,6 +87,12 @@ code.chronostra-sticky-overflow-reset,
   overflow: visible;
 }
 
+.workspace-leaf-content[data-type="chronostra"] .chronostra-view-content {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .chronostra-error {
   padding: 12px;
   color: var(--text-error);

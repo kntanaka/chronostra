@@ -98,6 +98,7 @@ function normalizeSettings(raw: unknown): ChronostraSettings {
     timelineEndYear: readNumber(settings.timelineEndYear, DEFAULT_SETTINGS.timelineEndYear),
     showRowBorders: readBoolean(settings.showRowBorders, DEFAULT_SETTINGS.showRowBorders),
     showSummaryMeta: readBoolean(settings.showSummaryMeta, DEFAULT_SETTINGS.showSummaryMeta),
+    zenMode: readBoolean(settings.zenMode, DEFAULT_SETTINGS.zenMode),
   };
 }
 
@@ -227,6 +228,7 @@ export default class ChronostraPlugin extends Plugin {
         timelineEndYear: this.settings.timelineEndYear,
         showRowBorders: this.settings.showRowBorders,
         showSummaryMeta: this.settings.showSummaryMeta,
+        zenMode: this.settings.zenMode,
         sourcePath: ctx.sourcePath,
         onExpandChange: (expandedIds: string[]) => {
           this.settings.expandedIds = expandedIds;

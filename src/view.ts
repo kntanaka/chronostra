@@ -73,6 +73,7 @@ export class ChronostraView extends ItemView {
         timelineEndYear: this.plugin.settings.timelineEndYear,
         showRowBorders: this.plugin.settings.showRowBorders,
         showSummaryMeta: this.plugin.settings.showSummaryMeta,
+        zenMode: this.plugin.settings.zenMode,
         sourcePath: this.plugin.settings.targetFilePath,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;

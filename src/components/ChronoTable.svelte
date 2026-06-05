@@ -117,6 +117,7 @@
     timelineEndYear: initialTimelineEndYear = 2050,
     showRowBorders: initialShowRowBorders = true,
     showSummaryMeta = false,
+    zenMode: initialZenMode = false,
     sourcePath = '',
     onExpandChange,
     onDataChange,
@@ -131,6 +132,7 @@
     timelineEndYear?: number;
     showRowBorders?: boolean;
     showSummaryMeta?: boolean;
+    zenMode?: boolean;
     sourcePath?: string;
     onExpandChange?: (expandedIds: string[]) => void;
     onDataChange?: (data: ChronoData) => void;
@@ -158,6 +160,10 @@
     return initialShowRowBorders;
   }
 
+  function getInitialZenMode() {
+    return initialZenMode;
+  }
+
   function getInitialData() {
     return structuredClone(initialData);
   }
@@ -172,6 +178,7 @@
   let timelineStartYear = $state(getInitialTimelineStartYear());
   let timelineEndYear = $state(getInitialTimelineEndYear());
   let showBorders = $state(getInitialShowRowBorders());
+  let zenMode = $state(getInitialZenMode());
 
   let searchQuery = $state('');
   let statusFilter = $state<StatusFilter>('all');
@@ -227,6 +234,17 @@
       commitmentFilter !== 'all' ||
       noteFilter !== 'all'
   );
+
+  const zenStatusText = $derived.by(() => {
+    const parts: string[] = [];
+    if (searchQuery.trim()) parts.push('search');
+    if (statusFilter !== 'all') parts.push(statusFilter);
+    if (scopeFilter !== 'all') parts.push(scopeFilter);
+    if (commitmentFilter !== 'all') parts.push(commitmentFilter);
+    if (noteFilter !== 'all') parts.push(noteFilter);
+    if (focusId || hasCategorySelection) parts.push('focused');
+    return parts.length > 0 ? parts.join(' / ') : 'all rows';
+  });
 
   const flatRows = $derived.by((): FlatRow[] => {
     if (!hasActiveFilters) return visibleRows;
@@ -306,6 +324,13 @@
     timelineEndYear = safeEnd;
     onSettingsChange?.('timelineStartYear', safeStart);
     onSettingsChange?.('timelineEndYear', safeEnd);
+  }
+
+  function toggleZenMode() {
+    zenMode = !zenMode;
+    showTemplateMenu = false;
+    closeRowMenu();
+    onSettingsChange?.('zenMode', zenMode);
   }
 
   let wrapperEl: HTMLDivElement | undefined = $state();
@@ -1142,8 +1167,34 @@
 
 <div class="chrono-wrapper" class:is-dragging={!!dragState} bind:this={wrapperEl}>
   <div class="sticky-chrome">
-    <div class="toolbar" class:mobile-toolbar={isMobileLayout}>
-      {#if isMobileLayout}
+    <div class="toolbar" class:mobile-toolbar={isMobileLayout} class:zen-toolbar={zenMode}>
+      {#if zenMode}
+        <div class="zen-toolbar-row">
+          <div class="zen-title-stack">
+            <span class="title">Chronostra</span>
+            <span class="row-count">{flatRows.length} rows · {zenStatusText}</span>
+            {#if saveIndicator}
+              <span class="save-indicator">Saved</span>
+            {/if}
+          </div>
+          <input
+            class="search-input zen-search-input"
+            type="search"
+            placeholder="Search"
+            bind:value={searchQuery}
+          />
+          {#if hasActiveFilters}
+            <button class="tool-link" onclick={resetFilters}>Clear</button>
+          {/if}
+          {#if focusId || hasCategorySelection}
+            <button class="tool-link tool-active" onclick={clearFocusSelection}>All</button>
+          {/if}
+          <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
+          <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
+          <button class="add-btn" onclick={addCategory}>+ Add</button>
+          <button class="tool-link tool-active zen-toggle" onclick={toggleZenMode}>Exit Zen</button>
+        </div>
+      {:else if isMobileLayout}
         <div class="mobile-toolbar-row mobile-toolbar-primary">
           <div class="mobile-title-stack">
             <span class="title">Chronostra</span>
@@ -1268,6 +1319,7 @@
             {/if}
           </div>
           <button class="add-btn" onclick={addCategory}>+ Add category</button>
+          <button class="tool-link zen-toggle" onclick={toggleZenMode}>Zen</button>
         </div>
 
         <div class="desktop-toolbar-row desktop-toolbar-filters">
@@ -1349,7 +1401,7 @@
       {/if}
     </div>
 
-    {#if !isMobileLayout && overviewRows.length > 0}
+    {#if !zenMode && !isMobileLayout && overviewRows.length > 0}
       <div class="overview-strip">
         {#each overviewRows as row (row.id)}
           <button
@@ -1552,6 +1604,11 @@
     overflow: visible;
     position: relative;
   }
+  :global(.workspace-leaf-content[data-type="chronostra"]) .chrono-wrapper {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
   .chrono-wrapper.is-dragging {
     cursor: grabbing;
     user-select: none;
@@ -1585,6 +1642,54 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px 14px;
+  }
+  .toolbar.zen-toolbar {
+    align-items: center;
+    flex-direction: row;
+    gap: 0;
+    padding: 4px 8px;
+  }
+  .zen-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+  }
+  .zen-title-stack {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 148px;
+    flex: 0 1 auto;
+  }
+  .zen-title-stack .row-count {
+    white-space: nowrap;
+  }
+  .toolbar.zen-toolbar .tool-link {
+    min-height: 24px;
+    padding: 0 7px;
+    border-radius: 4px;
+    font-size: 10px;
+  }
+  .toolbar.zen-toolbar .add-btn {
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .zen-search-input {
+    flex: 1 1 180px;
+    min-width: 120px;
+  }
+  .toolbar.zen-toolbar .zen-search-input {
+    height: 24px;
+    width: auto;
+    border-radius: 4px;
+  }
+  .zen-toggle {
+    white-space: nowrap;
   }
   .desktop-toolbar-row {
     display: flex;
@@ -1620,6 +1725,10 @@
     align-items: stretch;
     gap: 10px;
     padding: 10px 12px 12px;
+  }
+  .toolbar.mobile-toolbar.zen-toolbar {
+    gap: 0;
+    padding: 4px 8px;
   }
   .mobile-toolbar-row {
     display: flex;
@@ -1929,6 +2038,10 @@
     overflow: auto;
     position: relative;
     z-index: 0;
+  }
+  :global(.workspace-leaf-content[data-type="chronostra"]) .scroll-container {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .scroll-container:focus-within {
     z-index: 1;

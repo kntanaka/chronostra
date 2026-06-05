@@ -12,6 +12,7 @@ export interface ChronostraSettings {
   timelineEndYear: number;
   showRowBorders: boolean;
   showSummaryMeta: boolean;
+  zenMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: ChronostraSettings = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: ChronostraSettings = {
   timelineEndYear: 2050,
   showRowBorders: true,
   showSummaryMeta: false,
+  zenMode: false,
 };
 
 export class ChronostraSettingTab extends PluginSettingTab {
