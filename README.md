@@ -12,6 +12,26 @@
 
 ---
 
+## A Small Story
+
+You need a place where wishes can arrive quickly, before you overthink them: things to learn, places to visit, work to attempt, habits to build, objects you might want someday. But a wish list should not quietly reorder your life.
+
+A thing you want to buy should not make work expand until health disappears. A career goal should not consume the time you meant to protect for family. Chronostra keeps every wish inside a larger map: Health, Family, Work, Learning, Money, Travel, or whatever categories matter to you. Money and things can still have a place; they just do not get to become the whole plan.
+
+Then the timeline turns that map into milestones. Instead of one vague someday list, you can place goals year by year and see whether the shape of your future still matches your priorities.
+
+## Who It Helps
+
+Chronostra is for people whose lives have more than one scoreboard.
+
+**A student with too many possible futures** can keep classes, internships, language study, health, friends, and wild "maybe someday" ideas in the same map. Instead of choosing only from what feels urgent this week, they can see which small steps are opening doors for the next few years.
+
+**A founder, freelancer, or solo builder** can let product ideas, revenue goals, writing plans, and personal experiments move quickly without letting work swallow the rest of life. Health and relationships stay visible beside ambition, so growth has to share the table with recovery, family, and the life the work is supposed to support.
+
+**A manager or team lead** can separate long-range direction from quarterly goals and near-term actions. The timeline makes tradeoffs easier to discuss: which milestones matter this year, which can wait, and which "nice to have" ideas are starting to crowd out the commitments that actually protect the team.
+
+**A person with a full life outside work** can track travel, home, money, family, learning, and care responsibilities without turning all of it into a productivity system. Chronostra gives those wishes a shape, then helps them stay in proportion.
+
 ## The Problem
 
 Life-planning tools force a choice: beautiful but locked inside proprietary apps, or flexible but scattered across markdown files with no structure. They also confuse two different things — the dream you'll spend a decade chasing, and the chore you might do this weekend — and treat both as "tasks."
@@ -27,6 +47,8 @@ Chronostra renders a single `future-data` code block as a full-width interactive
 - A **commitment** — Must ★ or Wish ☆ (optional)
 - Three metric columns — **Future** (where you want to be), **Now** (where you are), and **Gap** (the delta)
 - A **timeline** spanning the years you choose (default 2025–2050)
+
+Use it for yearly planning, career roadmaps, learning plans, travel goals, health habits, family projects, or any long-running effort where small steps should stay connected to a larger horizon.
 
 ## Core Concepts
 
@@ -107,6 +129,10 @@ Notes:
 - `path` is an array of labels; the first element is the Category, the rest define nesting.
 - `scope` and `commitment` are **optional**. If `scope` is omitted, it's inferred from depth (1=vision, 2=goal, 3=step) — so existing data without these fields still works.
 - No database. No sync service. No lock-in. Just JSON in a markdown file.
+
+Chronostra intentionally keeps the plan in one `future-data` block. You can still link goals to richer notes when they need context, but every item does not have to become its own Markdown file. That keeps the source portable and helps large plans stay light when Obsidian starts up.
+
+The JSON is meant to stay boring on purpose. Chronostra is one interface for the plan, not the owner of it. If your needs change later, you can fork the plugin, edit the data with scripts or LLM-assisted workflows, or build a different front end around the same readable source.
 
 ## Installation
 
