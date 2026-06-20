@@ -40,17 +40,20 @@ function summarizeNode(node: TreeNode): NodeSummary {
 export function flattenTree(
   nodes: TreeNode[],
   treeState: TreeState,
-  parentIds: string[] = []
+  parentIds: string[] = [],
+  parentPath: string[] = []
 ): FlatRow[] {
   const rows: FlatRow[] = [];
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
+    const path = [...parentPath, node.label];
     const hasChildren = (node.children?.length ?? 0) > 0;
     const isExpanded = hasChildren && treeState.isExpanded(node.id);
 
     rows.push({
       id: node.id,
       label: node.label,
+      path,
       depth: node.depth,
       scope: node.scope,
       commitment: node.commitment,
@@ -66,7 +69,7 @@ export function flattenTree(
     });
 
     if (hasChildren && isExpanded) {
-      rows.push(...flattenTree(node.children!, treeState, [...parentIds, node.id]));
+      rows.push(...flattenTree(node.children!, treeState, [...parentIds, node.id], path));
     }
   }
   return rows;
