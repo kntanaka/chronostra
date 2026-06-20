@@ -59,6 +59,7 @@
   const todayRows = $derived(allRows.filter(isTodayCandidate).slice(0, 6));
   const inboxRows = $derived(allRows.filter(isInboxRow));
   const planRows = $derived(rows.filter((row) => !isInboxRow(row)));
+  const mobileRows = $derived([...inboxRows, ...planRows]);
 
   function toggleDetails(id: string) {
     openRowId = openRowId === id ? null : id;
@@ -152,6 +153,15 @@
     return parts.filter(Boolean).join(' / ');
   }
 
+  function quietMetaText(row: FlatRow): string {
+    const parts: string[] = [];
+    if (row.status === 'in-progress') parts.push('In progress');
+    const timeline = timelineText(row);
+    if (timeline) parts.push(timeline);
+    if (row.commitment) parts.push(row.commitment);
+    return parts.join(' / ');
+  }
+
   function toggleDone(row: FlatRow, checked: boolean) {
     onstatuschange?.(row.id, checked ? 'done' : 'todo');
   }
@@ -167,114 +177,25 @@
 </script>
 
 <div class="mobile-list">
-  <section class="mobile-section-group">
-    <div class="mobile-section-heading">
-      <span>Today</span>
-      <span>{todayRows.length} open</span>
-    </div>
-    {#if todayRows.length > 0}
-      {#each todayRows as row (row.id)}
-        <article class="mobile-row mobile-row-compact kind-{rowKind(row)}" style:--depth={Math.min(row.depth, 2)}>
-          <button
-            type="button"
-            class="mobile-check"
-            class:is-done={(row.status ?? 'todo') === 'done'}
-            aria-label={(row.status ?? 'todo') === 'done' ? 'Mark as todo' : 'Mark as done'}
-            onclick={(e) => {
-              e.stopPropagation();
-              toggleDone(row, (row.status ?? 'todo') !== 'done');
-            }}
-          ></button>
-          <div class="mobile-row-body">
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
-              {row.label}
-            </button>
-            <div class="mobile-row-meta">{metaText(row)}</div>
-          </div>
-          <button type="button" class="mobile-disclosure" title="Focus row" onclick={() => onfocus?.(row.id)}>
-            &gt;
-          </button>
-        </article>
-      {/each}
-    {:else}
-      <div class="mobile-empty-line">No open next actions.</div>
-    {/if}
-  </section>
-
-  <section class="mobile-section-group mobile-inbox-group">
-    <div class="mobile-section-heading">
-      <span>90 Inbox</span>
-      <span>{Math.max(inboxRows.length - 1, 0)} captured</span>
-    </div>
-    {#if inboxRows.length > 0}
-      {#each inboxRows as row (row.id)}
-        <article
-          class="mobile-row kind-{rowKind(row)}"
-          class:kind-category={row.depth === 0}
-          style:--depth={Math.max(row.depth - 1, 0)}
-        >
-          {#if row.depth > 0}
-            <button
-              type="button"
-              class="mobile-check"
-              class:is-done={(row.status ?? 'todo') === 'done'}
-              aria-label={(row.status ?? 'todo') === 'done' ? 'Mark as todo' : 'Mark as done'}
-              onclick={(e) => {
-                e.stopPropagation();
-                toggleDone(row, (row.status ?? 'todo') !== 'done');
-              }}
-            ></button>
-          {:else}
-            <span class="mobile-folder-mark"></span>
-          {/if}
-          <div class="mobile-row-body">
-            <div class="mobile-row-kicker">
-              <span>{scopeLabel(row)}</span>
-              <span>{row.status ?? 'todo'}</span>
-            </div>
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
-              {row.label}
-            </button>
-            {#if row.depth > 0}
-              <div class="mobile-row-meta">{metaText(row)}</div>
-            {:else if showSummaryMeta && row.summary}
-              <div class="mobile-row-meta">{summaryText(row)}</div>
-            {/if}
-          </div>
-          <div class="mobile-head-actions">
-            {#if row.hasChildren}
-              <button type="button" class="mobile-disclosure" title={row.isExpanded ? 'Collapse' : 'Expand'} onclick={() => ontoggle(row.id)}>
-                {row.isExpanded ? '-' : '+'}
-              </button>
-            {/if}
-            <button type="button" class="mobile-disclosure" title="Focus row" onclick={() => onfocus?.(row.id)}>
-              &gt;
-            </button>
-          </div>
-        </article>
-      {/each}
-    {:else}
-      <button type="button" class="mobile-capture-empty" onclick={() => { captureOpen = true; }}>
-        Capture a thought into 90 Inbox
-      </button>
-    {/if}
-  </section>
-
-  <section class="mobile-section-group">
+  <section class="mobile-section-group mobile-tree-group">
     <div class="mobile-section-heading">
       <span>Plan</span>
-      <span>{planRows.length} rows</span>
+      <span>{todayRows.length} today · {Math.max(inboxRows.length - 1, 0)} inbox</span>
     </div>
-    {#each planRows as row (row.id)}
+    {#each mobileRows as row (row.id)}
       {@const isOpen = openRowId === row.id}
       {@const timelineEntries = row.timeline.filter((entry) => entry.text.trim()).sort((a, b) => a.year - b.year)}
       <article
         class="mobile-row kind-{rowKind(row)}"
         class:is-open={isOpen}
+        class:is-child={row.depth > 0}
+        class:is-leaf={!row.hasChildren}
         class:kind-category={row.depth === 0}
         style:--depth={Math.min(row.depth, 2)}
       >
-        {#if row.depth > 0}
+        {#if row.hasChildren || row.depth === 0}
+          <span class="mobile-folder-mark"></span>
+        {:else}
           <button
             type="button"
             class="mobile-check"
@@ -285,23 +206,29 @@
               toggleDone(row, (row.status ?? 'todo') !== 'done');
             }}
           ></button>
-        {:else}
-          <span class="mobile-folder-mark"></span>
         {/if}
 
         <div class="mobile-row-body">
-          <div class="mobile-row-kicker">
-            <span>{scopeLabel(row)}</span>
-            <span>{row.status ?? 'todo'}</span>
-            {#if row.commitment}
-              <span>{row.commitment}</span>
-            {/if}
-          </div>
+          {#if row.depth === 0 || row.status === 'in-progress' || row.commitment}
+            <div class="mobile-row-kicker">
+              {#if row.depth === 0}
+                <span>{scopeLabel(row)}</span>
+              {/if}
+              {#if row.status === 'in-progress'}
+                <span>In progress</span>
+              {/if}
+              {#if row.commitment}
+                <span>{row.commitment}</span>
+              {/if}
+            </div>
+          {/if}
           <button type="button" class="mobile-label-button" onclick={() => toggleDetails(row.id)}>
             {row.label}
           </button>
-          <div class="mobile-row-meta">{metaText(row)}</div>
-          {#if showSummaryMeta && row.summary}
+          {#if quietMetaText(row)}
+            <div class="mobile-row-meta">{quietMetaText(row)}</div>
+          {/if}
+          {#if row.depth === 0 && showSummaryMeta && row.summary}
             <div class="mobile-summary">{summaryText(row)}</div>
           {/if}
         </div>
@@ -309,15 +236,12 @@
         <div class="mobile-head-actions">
           {#if row.hasChildren}
             <button type="button" class="mobile-disclosure" title={row.isExpanded ? 'Collapse' : 'Expand'} onclick={() => ontoggle(row.id)}>
-              {row.isExpanded ? '-' : '+'}
+              {row.isExpanded ? '^' : 'v'}
             </button>
           {/if}
-          <button type="button" class="mobile-disclosure" title={isOpen ? 'Close details' : 'Open details'} onclick={() => toggleDetails(row.id)}>
-            {isOpen ? '^' : 'v'}
-          </button>
         </div>
 
-        {#if timelineEntries.length > 0}
+        {#if isOpen && timelineEntries.length > 0}
           <div class="mobile-timeline-peek">
             {#each timelineEntries.slice(0, 3) as entry (entry.year)}
               <span>{entry.year}: {entry.text}</span>
@@ -493,7 +417,7 @@
     width: 100%;
     max-height: calc(100dvh - 132px);
     min-height: 0;
-    padding: 2px 10px calc(92px + env(safe-area-inset-bottom, 0px));
+    padding: 0 10px calc(82px + env(safe-area-inset-bottom, 0px));
     background: var(--background-primary);
     overflow-x: hidden;
     overflow-y: auto;
@@ -534,6 +458,10 @@
     padding-top: 0;
   }
 
+  .mobile-tree-group {
+    border-top: 1px solid var(--background-modifier-border);
+  }
+
   .mobile-section-heading {
     position: sticky;
     top: 0;
@@ -542,13 +470,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 32px;
-    padding: 0 4px;
+    min-height: 28px;
+    padding: 0 2px;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     color: var(--text-faint);
-    font-size: 10px;
-    letter-spacing: 0.06em;
+    font-size: 9px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
   }
 
@@ -557,23 +485,39 @@
     font-weight: 600;
   }
 
-  .mobile-inbox-group {
-    border-top: none;
-    border-bottom: none;
-    margin-top: 0;
-    padding-bottom: 0;
-  }
-
   .mobile-row {
-    --indent: calc(var(--depth) * 12px);
+    --indent: calc(var(--depth) * 18px);
+    position: relative;
     display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) auto;
-    column-gap: 8px;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    column-gap: 9px;
     align-items: start;
     border-bottom: 1px solid var(--background-modifier-border);
-    padding: 10px 2px 10px var(--indent);
+    padding: 9px 0 9px calc(2px + var(--indent));
     background: var(--chronostra-bg-goal);
     transition: background 0.08s ease;
+  }
+
+  .mobile-row.is-child::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--indent) - 8px);
+    width: 1px;
+    background: var(--background-modifier-border);
+    opacity: 0.7;
+  }
+
+  .mobile-row.is-child::after {
+    content: '';
+    position: absolute;
+    top: 22px;
+    left: calc(var(--indent) - 8px);
+    width: 8px;
+    height: 1px;
+    background: var(--background-modifier-border);
+    opacity: 0.7;
   }
 
   .mobile-row:hover,
@@ -606,9 +550,9 @@
   }
 
   .mobile-row.kind-category {
-    grid-template-columns: 22px minmax(0, 1fr) auto;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    padding-top: 11px;
+    padding-bottom: 11px;
   }
 
   .mobile-row-body {
@@ -618,11 +562,11 @@
   .mobile-row-kicker {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 2px;
+    gap: 7px;
+    margin-bottom: 3px;
     color: var(--text-faint);
     font-size: 9px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
   }
 
@@ -630,7 +574,7 @@
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    min-height: 26px;
+    min-height: 22px;
     padding: 0 !important;
     border: none !important;
     border-radius: 0 !important;
@@ -638,7 +582,7 @@
     background: transparent !important;
     color: var(--text-normal) !important;
     font: inherit;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: inherit;
     line-height: 1.35;
     text-align: left !important;
@@ -651,7 +595,7 @@
   }
 
   .mobile-row.kind-step .mobile-label-button {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
   }
 
@@ -660,7 +604,7 @@
   .mobile-empty-line,
   .mobile-empty-state {
     color: var(--text-faint);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.45;
   }
 
@@ -689,8 +633,8 @@
   }
 
   .mobile-check {
-    width: 16px !important;
-    height: 16px !important;
+    width: 14px !important;
+    height: 14px !important;
     padding: 0 !important;
     margin-top: 4px !important;
     border-radius: 50%;
@@ -708,16 +652,16 @@
     left: 4px;
     top: 1px;
     width: 4px;
-    height: 8px;
+    height: 7px;
     border: solid var(--interactive-accent);
     border-width: 0 1px 1px 0;
     transform: rotate(45deg);
   }
 
   .mobile-folder-mark {
-    width: 16px;
-    height: 11px;
-    margin-top: 8px;
+    width: 14px;
+    height: 10px;
+    margin-top: 6px;
     border-radius: 1px;
     border-color: var(--text-faint);
     opacity: 0.7;
@@ -725,19 +669,20 @@
 
   .mobile-head-actions {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     flex-shrink: 0;
   }
 
   .mobile-disclosure {
-    width: 28px !important;
-    min-width: 28px !important;
-    height: 28px !important;
+    width: 24px !important;
+    min-width: 24px !important;
+    height: 24px !important;
     padding: 0 !important;
     border-color: transparent;
-    border-radius: 6px;
+    border-radius: 5px;
     font: inherit;
-    font-size: 11px;
+    color: var(--text-faint);
+    font-size: 12px;
     line-height: 1;
   }
 
@@ -752,7 +697,7 @@
     display: flex;
     gap: 6px;
     overflow-x: auto;
-    padding: 6px 0 0;
+    padding: 8px 0 0;
   }
 
   .mobile-timeline-peek span {
@@ -772,7 +717,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 10px 0 4px;
+    padding: 11px 0 4px calc(18px + var(--indent));
+    border-top: 1px solid var(--background-modifier-border);
   }
 
   .mobile-field-grid {
@@ -814,8 +760,8 @@
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
-    background: var(--background-primary);
+    border-radius: 6px;
+    background: var(--background-secondary);
     color: var(--text-normal);
     font: inherit;
     font-size: 13px;
@@ -870,8 +816,8 @@
     -webkit-appearance: none;
     min-height: 40px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
-    background: transparent;
+    border-radius: 6px;
+    background: var(--background-secondary);
     color: var(--text-muted);
     box-shadow: none;
     font: inherit;
@@ -904,11 +850,11 @@
     position: sticky;
     left: auto;
     right: auto;
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(7px + env(safe-area-inset-bottom, 0px));
     z-index: 1200;
     display: flex;
     justify-content: stretch;
-    padding: 10px 0 0;
+    padding: 12px 0 0;
     margin-top: 6px;
     border-top: none;
     background: linear-gradient(to top, var(--background-primary) 68%, transparent);
@@ -920,7 +866,7 @@
     -webkit-appearance: none;
     pointer-events: auto;
     width: 100%;
-    min-height: 42px !important;
+    min-height: 40px !important;
     display: flex;
     gap: 8px;
     align-items: center;
@@ -939,7 +885,7 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    border-radius: 0;
+    border-radius: 50%;
     background: transparent;
     color: var(--interactive-accent);
     font-size: 16px;
