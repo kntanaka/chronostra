@@ -32,6 +32,7 @@
 
   const ROW_HEIGHT = 64;
   const HISTORY_LIMIT = 50;
+  const MOBILE_LAYOUT_MAX_WIDTH = 720;
   const INBOX_CATEGORY_LABEL = '90 Inbox';
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
   const STATUS_FILTER_OPTIONS = [
@@ -359,9 +360,32 @@
   }
 
   let wrapperEl: HTMLDivElement | undefined = $state();
+  let wrapperWidth = $state<number | null>(null);
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
-  const isMobileLayout = $derived(isMobileApp);
+  const isMobileLayout = $derived(
+    isMobileApp || (wrapperWidth !== null && wrapperWidth <= MOBILE_LAYOUT_MAX_WIDTH)
+  );
+
+  $effect(() => {
+    if (!wrapperEl) return;
+
+    const ownerWindow = getOwnerWindow(wrapperEl);
+    const measure = () => {
+      wrapperWidth = wrapperEl?.getBoundingClientRect().width ?? null;
+    };
+
+    measure();
+
+    if (!ownerWindow.ResizeObserver) {
+      ownerWindow.addEventListener('resize', measure);
+      return () => ownerWindow.removeEventListener('resize', measure);
+    }
+
+    const observer = new ownerWindow.ResizeObserver(measure);
+    observer.observe(wrapperEl);
+    return () => observer.disconnect();
+  });
 
   function handleToggle(id: string) {
     treeState.toggle(id);
