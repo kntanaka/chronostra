@@ -3,6 +3,8 @@
   import type { CellNavigationDirection, FlatRow } from '../types';
   import ExpandToggle from './ExpandToggle.svelte';
 
+  const EDITOR_OFFSET = 0;
+
   let { row, width, showSummaryMeta = false, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onnoteclick, onnavigate }: {
     row: FlatRow;
     width: number;
@@ -69,8 +71,8 @@
     if (!shellEl) return;
     const rect = shellEl.getBoundingClientRect();
     const anchorRect = getFixedAnchorRect(shellEl);
-    editorTop = rect.top - anchorRect.top + 4;
-    editorLeft = rect.left - anchorRect.left + 2;
+    editorTop = rect.top - anchorRect.top + EDITOR_OFFSET;
+    editorLeft = rect.left - anchorRect.left + EDITOR_OFFSET;
     editorWidth = Math.min(rect.width + 36, 420);
   }
 
@@ -116,8 +118,8 @@
       if (!shellEl || !inputEl) return;
       const desired = shellEl.getBoundingClientRect();
       const actual = inputEl.getBoundingClientRect();
-      editorTop += desired.top + 4 - actual.top;
-      editorLeft += desired.left + 2 - actual.left;
+      editorTop += desired.top + EDITOR_OFFSET - actual.top;
+      editorLeft += desired.left + EDITOR_OFFSET - actual.left;
     });
   }
 
