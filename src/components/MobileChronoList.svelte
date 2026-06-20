@@ -48,6 +48,7 @@
 
   let openRowId = $state<string | null>(null);
   let confirmDeleteId = $state<string | null>(null);
+  let timelineEditRowId = $state<string | null>(null);
   let timelineDraftYears = $state<Record<string, number>>({});
   let timelineDraftTexts = $state<Record<string, string>>({});
   let captureOpen = $state(false);
@@ -64,6 +65,7 @@
   function toggleDetails(id: string) {
     openRowId = openRowId === id ? null : id;
     confirmDeleteId = null;
+    timelineEditRowId = null;
   }
 
   function commitLabel(row: FlatRow, value: string) {
@@ -295,40 +297,65 @@
               </label>
             </div>
 
-            <section class="mobile-section">
-              <div class="mobile-section-title">Timeline</div>
+            <section class="mobile-section mobile-timeline-section">
+              <div class="mobile-section-header">
+                <div class="mobile-section-title">Timeline</div>
+                {#if timelineEntries.length > 0}
+                  <button
+                    type="button"
+                    class="mobile-inline-action"
+                    onclick={() => {
+                      timelineEditRowId = timelineEditRowId === row.id ? null : row.id;
+                    }}
+                  >
+                    {timelineEditRowId === row.id ? 'Done' : 'Edit'}
+                  </button>
+                {/if}
+              </div>
               {#if timelineEntries.length > 0}
-                <div class="mobile-timeline-list">
+                <div class="mobile-timeline-read">
                   {#each timelineEntries as entry (entry.year)}
-                    <label class="mobile-timeline-edit">
+                    <div class="mobile-timeline-read-row">
                       <span>{entry.year}</span>
-                      <textarea rows="2" value={entry.text} onchange={(e) => commitTimeline(row, entry.year, (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
-                    </label>
+                      <p>{entry.text}</p>
+                    </div>
                   {/each}
                 </div>
               {:else}
                 <div class="mobile-empty-line">No timeline entries.</div>
               {/if}
-              <div class="mobile-add-timeline">
-                <input
-                  type="number"
-                  min={startYear}
-                  max={endYear}
-                  value={timelineDraftYears[row.id] ?? startYear}
-                  onchange={(e) => {
-                    timelineDraftYears[row.id] = parseInt((e.currentTarget as HTMLInputElement).value, 10) || startYear;
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Add milestone"
-                  value={timelineDraftTexts[row.id] ?? ''}
-                  oninput={(e) => {
-                    timelineDraftTexts[row.id] = (e.currentTarget as HTMLInputElement).value;
-                  }}
-                />
-                <button type="button" onclick={() => addTimelineEntry(row)}>Add</button>
-              </div>
+              {#if timelineEditRowId === row.id || timelineEntries.length === 0}
+                {#if timelineEntries.length > 0}
+                  <div class="mobile-timeline-list">
+                    {#each timelineEntries as entry (entry.year)}
+                      <label class="mobile-timeline-edit">
+                        <span>{entry.year}</span>
+                        <textarea rows="2" value={entry.text} onchange={(e) => commitTimeline(row, entry.year, (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
+                      </label>
+                    {/each}
+                  </div>
+                {/if}
+                <div class="mobile-add-timeline">
+                  <input
+                    type="number"
+                    min={startYear}
+                    max={endYear}
+                    value={timelineDraftYears[row.id] ?? startYear}
+                    onchange={(e) => {
+                      timelineDraftYears[row.id] = parseInt((e.currentTarget as HTMLInputElement).value, 10) || startYear;
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Add milestone"
+                    value={timelineDraftTexts[row.id] ?? ''}
+                    oninput={(e) => {
+                      timelineDraftTexts[row.id] = (e.currentTarget as HTMLInputElement).value;
+                    }}
+                  />
+                  <button type="button" onclick={() => addTimelineEntry(row)}>Add</button>
+                </div>
+              {/if}
             </section>
 
             <div class="mobile-actions">
@@ -771,6 +798,27 @@
     text-transform: uppercase;
   }
 
+  .mobile-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-inline-action {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 28px !important;
+    padding: 0 9px !important;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+  }
+
   .mobile-field textarea,
   .mobile-timeline-edit textarea,
   .mobile-field select,
@@ -815,6 +863,54 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .mobile-timeline-section {
+    gap: 8px;
+  }
+
+  .mobile-timeline-read {
+    max-height: 196px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border-left: 1px solid var(--background-modifier-border);
+    scrollbar-width: none;
+  }
+
+  .mobile-timeline-read::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-timeline-read-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    padding: 5px 0 7px 10px;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .mobile-timeline-read-row:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-timeline-read-row span {
+    color: var(--text-faint);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+  }
+
+  .mobile-timeline-read-row p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 11.5px;
+    line-height: 1.35;
+    word-break: break-word;
   }
 
   .mobile-timeline-edit {
