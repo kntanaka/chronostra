@@ -52,8 +52,7 @@
 
   $effect(() => {
     if (autoEdit && onlabelchange && !editing) {
-      editing = true;
-      editValue = row.label;
+      startEdit();
       onautoedited?.();
     }
   });
