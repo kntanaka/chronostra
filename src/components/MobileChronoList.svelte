@@ -225,10 +225,10 @@
           <button type="button" class="mobile-label-button" onclick={() => toggleDetails(row.id)}>
             {row.label}
           </button>
-          {#if quietMetaText(row)}
+          {#if isOpen && quietMetaText(row)}
             <div class="mobile-row-meta">{quietMetaText(row)}</div>
           {/if}
-          {#if row.depth === 0 && showSummaryMeta && row.summary}
+          {#if isOpen && row.depth === 0 && showSummaryMeta && row.summary}
             <div class="mobile-summary">{summaryText(row)}</div>
           {/if}
         </div>
@@ -489,11 +489,12 @@
     --indent: calc(var(--depth) * 18px);
     position: relative;
     display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    column-gap: 9px;
-    align-items: start;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    column-gap: 7px;
+    align-items: center;
+    min-height: 44px;
     border-bottom: 1px solid var(--background-modifier-border);
-    padding: 9px 0 9px calc(2px + var(--indent));
+    padding: 5px 0 5px calc(2px + var(--indent));
     background: var(--chronostra-bg-goal);
     transition: background 0.08s ease;
   }
@@ -512,7 +513,7 @@
   .mobile-row.is-child::after {
     content: '';
     position: absolute;
-    top: 22px;
+    top: 21px;
     left: calc(var(--indent) - 8px);
     width: 8px;
     height: 1px;
@@ -546,13 +547,14 @@
   }
 
   .mobile-row-compact {
-    min-height: 48px;
+    min-height: 44px;
   }
 
   .mobile-row.kind-category {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    padding-top: 11px;
-    padding-bottom: 11px;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    min-height: 46px;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
   .mobile-row-body {
@@ -563,9 +565,10 @@
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    margin-bottom: 3px;
+    margin-bottom: 1px;
     color: var(--text-faint);
     font-size: 9px;
+    line-height: 1.1;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -574,7 +577,10 @@
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    min-height: 22px;
+    min-height: 32px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     padding: 0 !important;
     border: none !important;
     border-radius: 0 !important;
@@ -582,9 +588,10 @@
     background: transparent !important;
     color: var(--text-normal) !important;
     font: inherit;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: inherit;
-    line-height: 1.35;
+    line-height: 1.25;
+    overflow: hidden;
     text-align: left !important;
     word-break: break-word;
   }
@@ -604,14 +611,14 @@
   .mobile-empty-line,
   .mobile-empty-state {
     color: var(--text-faint);
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: 10px;
+    line-height: 1.35;
   }
 
   .mobile-row-meta {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -633,24 +640,40 @@
   }
 
   .mobile-check {
-    width: 14px !important;
-    height: 14px !important;
+    width: 24px !important;
+    height: 24px !important;
     padding: 0 !important;
-    margin-top: 4px !important;
+    margin-top: 0 !important;
+    border-radius: 50%;
+    position: relative;
+    border-color: transparent;
+  }
+
+  .mobile-check::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--background-modifier-border);
     border-radius: 50%;
   }
 
   .mobile-check.is-done {
-    border-color: var(--interactive-accent);
+    border-color: transparent;
     background: transparent;
-    position: relative;
+  }
+
+  .mobile-check.is-done::before {
+    border-color: var(--interactive-accent);
   }
 
   .mobile-check.is-done::after {
     content: '';
     position: absolute;
-    left: 4px;
-    top: 1px;
+    left: 10px;
+    top: 7px;
     width: 4px;
     height: 7px;
     border: solid var(--interactive-accent);
@@ -659,9 +682,9 @@
   }
 
   .mobile-folder-mark {
-    width: 14px;
-    height: 10px;
-    margin-top: 6px;
+    width: 13px;
+    height: 9px;
+    margin: 0 0 0 5px;
     border-radius: 1px;
     border-color: var(--text-faint);
     opacity: 0.7;
@@ -674,9 +697,9 @@
   }
 
   .mobile-disclosure {
-    width: 24px !important;
-    min-width: 24px !important;
-    height: 24px !important;
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
     padding: 0 !important;
     border-color: transparent;
     border-radius: 5px;
@@ -716,8 +739,8 @@
     grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 11px 0 4px calc(18px + var(--indent));
+    gap: 10px;
+    padding: 9px 0 4px calc(18px + var(--indent));
     border-top: 1px solid var(--background-modifier-border);
   }
 
