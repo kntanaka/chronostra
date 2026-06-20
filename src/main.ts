@@ -1,6 +1,7 @@
 import {
   Plugin,
   MarkdownPostProcessorContext,
+  Platform,
   TFile,
   TFolder,
   WorkspaceLeaf,
@@ -229,6 +230,7 @@ export default class ChronostraPlugin extends Plugin {
         showRowBorders: this.settings.showRowBorders,
         showSummaryMeta: this.settings.showSummaryMeta,
         zenMode: this.settings.zenMode,
+        isMobileApp: Platform.isMobileApp,
         sourcePath: ctx.sourcePath,
         onExpandChange: (expandedIds: string[]) => {
           this.settings.expandedIds = expandedIds;
