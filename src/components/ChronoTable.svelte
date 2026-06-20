@@ -32,6 +32,7 @@
 
   const ROW_HEIGHT = 64;
   const HISTORY_LIMIT = 50;
+  const MOBILE_LAYOUT_MAX_WIDTH = 720;
   const INBOX_CATEGORY_LABEL = '90 Inbox';
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
   const STATUS_FILTER_OPTIONS = [
@@ -359,9 +360,32 @@
   }
 
   let wrapperEl: HTMLDivElement | undefined = $state();
+  let wrapperWidth = $state<number | null>(null);
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
-  const isMobileLayout = $derived(isMobileApp);
+  const isMobileLayout = $derived(
+    isMobileApp || (wrapperWidth !== null && wrapperWidth <= MOBILE_LAYOUT_MAX_WIDTH)
+  );
+
+  $effect(() => {
+    if (!wrapperEl) return;
+
+    const ownerWindow = getOwnerWindow(wrapperEl);
+    const measure = () => {
+      wrapperWidth = wrapperEl?.getBoundingClientRect().width ?? null;
+    };
+
+    measure();
+
+    if (!ownerWindow.ResizeObserver) {
+      ownerWindow.addEventListener('resize', measure);
+      return () => ownerWindow.removeEventListener('resize', measure);
+    }
+
+    const observer = new ownerWindow.ResizeObserver(measure);
+    observer.observe(wrapperEl);
+    return () => observer.disconnect();
+  });
 
   function handleToggle(id: string) {
     treeState.toggle(id);
@@ -1280,102 +1304,19 @@
           {#if saveIndicator}
             <span class="save-indicator">Saved</span>
           {/if}
-          <button class="add-btn" onclick={addCategory}>+ Category</button>
+          <button class="add-btn mobile-icon-add" aria-label="Add category" title="Add category" onclick={addCategory}>+</button>
         </div>
 
-        <input
-          class="search-input"
-          type="search"
-          placeholder="Search"
-          bind:value={searchQuery}
-        />
-
-        <div class="mobile-filter-strip">
-          <DropdownSelect
-            value={statusFilter}
-            options={STATUS_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={126}
-            onchange={(next) => { statusFilter = next as StatusFilter; }}
+        <div class="mobile-search-row">
+          <input
+            class="search-input"
+            type="search"
+            placeholder="Search plans, goals, projects..."
+            bind:value={searchQuery}
           />
-          <DropdownSelect
-            value={scopeFilter}
-            options={SCOPE_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={126}
-            onchange={(next) => { scopeFilter = next as ScopeFilter; }}
-          />
-          <DropdownSelect
-            value={commitmentFilter}
-            options={COMMITMENT_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={118}
-            onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
-          />
-          <DropdownSelect
-            value={noteFilter}
-            options={NOTE_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={120}
-            onchange={(next) => { noteFilter = next as NoteFilter; }}
-          />
-          {#if hasActiveFilters}
-            <button class="mobile-clear-button" onclick={resetFilters}>Clear</button>
+          {#if hasActiveFilters || focusId || hasCategorySelection}
+            <button class="mobile-clear-button" onclick={() => { resetFilters(); clearFocusSelection(); }}>All</button>
           {/if}
-        </div>
-
-        <div class="mobile-toolbar-row mobile-toolbar-secondary">
-          <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
-          <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
-          <button class="tool-link" onclick={expandAll} title="Expand all">Expand</button>
-          <button class="tool-link" onclick={collapseAll} title="Collapse all">Collapse</button>
-          {#if focusId || hasCategorySelection}
-            <button class="tool-link tool-active" onclick={clearFocusSelection}>All</button>
-          {/if}
-          <div class="toolbar-menu-anchor" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
-            <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
-              Templates
-            </button>
-            {#if showTemplateMenu}
-              <div class="chronostra-menu toolbar-menu" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
-                {#each ROOT_TEMPLATES as template}
-                  <button
-                    type="button"
-                    class="chronostra-menu-item"
-                    onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
-                  >
-                    {template.label}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <div class="mobile-toolbar-row mobile-timeline-row">
-          <DropdownSelect
-            value={timelineDisplay}
-            options={TIMELINE_DISPLAY_OPTIONS}
-            variant="mobile"
-            minWidth={118}
-            onchange={updateTimelineDisplay}
-          />
-          <div class="range-control">
-            <span>Timeline</span>
-            <input
-              class="range-input"
-              type="number"
-              value={timelineStartYear}
-              onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
-            />
-            <span>to</span>
-            <input
-              class="range-input"
-              type="number"
-              value={timelineEndYear}
-              onchange={(e) => normalizeTimelineRange(timelineStartYear, parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineEndYear)}
-            />
-          </div>
         </div>
       {:else}
         <div class="desktop-toolbar-row desktop-toolbar-primary">
@@ -1811,8 +1752,8 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    padding: 10px 12px 12px;
+    gap: 8px;
+    padding: 8px 10px 9px;
   }
   .toolbar.mobile-toolbar.zen-toolbar {
     gap: 0;
@@ -1826,6 +1767,7 @@
   }
   .mobile-toolbar-primary {
     justify-content: space-between;
+    min-height: 30px;
   }
   .mobile-title-stack {
     display: flex;
@@ -1833,23 +1775,11 @@
     gap: 10px;
     min-width: 0;
   }
-  .mobile-filter-strip {
+  .mobile-search-row {
     display: flex;
+    align-items: center;
     gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-  .mobile-filter-strip::-webkit-scrollbar {
-    display: none;
-  }
-  .mobile-toolbar-secondary {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .mobile-timeline-row {
-    flex-wrap: wrap;
-    color: var(--text-faint);
+    min-width: 0;
   }
   .title {
     font-weight: 600;
@@ -1945,11 +1875,14 @@
     border-radius: 5px;
   }
   .mobile-toolbar .search-input {
+    flex: 1 1 auto;
     width: 100%;
     min-width: 0;
-    height: 40px;
-    font-size: 14px;
-    border-radius: 6px;
+    height: 34px;
+    border-color: var(--background-modifier-border);
+    border-radius: 7px;
+    background: var(--background-secondary);
+    font-size: 12px;
   }
   .mobile-toolbar .tool-link {
     min-height: 32px;
@@ -1966,8 +1899,8 @@
     appearance: none;
     -webkit-appearance: none;
     flex: 0 0 auto;
-    min-height: 32px;
-    padding: 0 10px;
+    min-height: 34px;
+    padding: 0 11px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     background: transparent;
@@ -2040,13 +1973,18 @@
   .mobile-toolbar .add-btn {
     flex: 0 0 auto;
     margin-left: 0;
-    min-height: 36px;
-    padding: 0 12px;
+    min-width: 34px;
+    min-height: 34px;
+    display: grid;
+    place-items: center;
+    padding: 0;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
+    border-radius: 7px;
+    background: var(--background-secondary);
     color: var(--text-normal);
     text-decoration: none;
-    font-size: 12px;
+    font-size: 18px;
+    line-height: 1;
   }
   .add-btn:hover {
     color: var(--text-normal);
