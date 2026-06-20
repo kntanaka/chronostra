@@ -216,7 +216,9 @@ export default class ChronostraPlugin extends Plugin {
 
     const container = el.createDiv({ cls: 'chronostra-container' });
 
-    const restoreStickyAncestors = fixAncestorsForStickyToolbar(container);
+    const restoreStickyAncestors = Platform.isMobileApp
+      ? () => {}
+      : fixAncestorsForStickyToolbar(container);
 
     const instance = mount(ChronoTable, {
       target: container,
