@@ -430,7 +430,7 @@
   }
 
   function snapshotData(): ChronoData {
-    return structuredClone(data);
+    return structuredClone($state.snapshot(data));
   }
 
   let undoStack = $state<ChronoData[]>([]);
