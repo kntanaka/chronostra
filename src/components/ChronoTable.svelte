@@ -191,6 +191,8 @@
   let focusId = $state<string | null>(null);
   let selectedCategoryIds = $state<string[]>([]);
   let showTemplateMenu = $state(false);
+  let revealRowId = $state<string | null>(null);
+  let lastFilterKey = $state('');
 
   // Mutable copy of the data tree
   let data = $state<ChronoData>(getInitialData());
@@ -238,6 +240,16 @@
       noteFilter !== 'all'
   );
 
+  const filterKey = $derived(
+    [
+      searchQuery.trim(),
+      statusFilter,
+      scopeFilter,
+      commitmentFilter,
+      noteFilter,
+    ].join('\u0000')
+  );
+
   const zenStatusText = $derived.by(() => {
     const parts: string[] = [];
     if (searchQuery.trim()) parts.push('search');
@@ -254,7 +266,7 @@
 
     const visibleIds = new Set<string>();
     for (const row of expandedRows) {
-      if (matchesRowFilters(row)) {
+      if (matchesRowFilters(row) || row.id === revealRowId) {
         visibleIds.add(row.id);
         for (const parentId of row.parentIds) {
           visibleIds.add(parentId);
@@ -263,6 +275,14 @@
     }
 
     return expandedRows.filter((row) => visibleIds.has(row.id));
+  });
+
+  $effect(() => {
+    const nextKey = filterKey;
+    if (lastFilterKey && nextKey !== lastFilterKey) {
+      revealRowId = null;
+    }
+    lastFilterKey = nextKey;
   });
 
   const birthYear = $derived.by(() => {
@@ -440,6 +460,11 @@
     pendingEditColumn = column;
     activeRowId = rowId;
     void scrollCellIntoView(rowId, column);
+  }
+
+  function queueCreatedRow(rowId: string) {
+    revealRowId = rowId;
+    queueEditTarget(rowId, 'hierarchy');
   }
 
   function clearEditTarget() {
@@ -827,21 +852,26 @@
 
   function addChild(parentId: string) {
     const newId = generateId();
+    let didCreate = false;
     commitMutation(() => {
       const node = findNode(data.categories, parentId);
       if (!node) return false;
+      if (node.depth >= MAX_DEPTH) return false;
       if (!node.children) node.children = [];
       const child = createNode('New item', node.depth + 1);
       child.id = newId;
       node.children.push(child);
       treeState.expand(parentId);
+      didCreate = true;
       return true;
     });
-    pendingEditId = newId;
+    if (didCreate) queueCreatedRow(newId);
   }
 
   function addSibling(id: string) {
     const newId = generateId();
+    let didCreate = false;
+    let shouldFocusCreatedRow = false;
     commitMutation(() => {
       const loc = findParentAndIndex(data.categories, id);
       if (!loc) return false;
@@ -849,9 +879,17 @@
       const next = createNode('New item', sibling.depth);
       next.id = newId;
       loc.parent.splice(loc.index + 1, 0, next);
+      shouldFocusCreatedRow = focusId !== null || (hasCategorySelection && sibling.depth === 0);
+      didCreate = true;
       return true;
     });
-    pendingEditId = newId;
+    if (didCreate) {
+      if (shouldFocusCreatedRow) {
+        selectedCategoryIds = [];
+        focusId = newId;
+      }
+      queueCreatedRow(newId);
+    }
   }
 
   function deleteRow(id: string) {
@@ -1187,6 +1225,7 @@
     scopeFilter = 'all';
     commitmentFilter = 'all';
     noteFilter = 'all';
+    revealRowId = null;
   }
 
   function toggleCategorySelection(categoryId: string) {
@@ -1574,7 +1613,12 @@
           style:top="{rowMenu.y}px"
           onpointerdown={(e) => e.stopPropagation()}
         >
-          <button type="button" class="context-item" onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}>
+          <button
+            type="button"
+            class="context-item"
+            disabled={(findNode(data.categories, rowMenu.id)?.depth ?? MAX_DEPTH) >= MAX_DEPTH}
+            onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}
+          >
             + Add child
           </button>
           <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
@@ -2149,6 +2193,14 @@
   }
   .context-item:hover {
     background: var(--background-secondary);
+  }
+  .context-item:disabled {
+    color: var(--text-faint);
+    cursor: default;
+    opacity: 0.55;
+  }
+  .context-item:disabled:hover {
+    background: none;
   }
   .context-item.danger {
     color: var(--text-muted);

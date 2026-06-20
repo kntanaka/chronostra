@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Commitment, FlatRow, ItemStatus } from '../types';
-  import { effectiveScope } from '../types';
+  import { MAX_DEPTH, effectiveScope } from '../types';
 
   type QuickCaptureType = 'task' | 'idea' | 'project' | 'goal';
 
@@ -408,7 +408,7 @@
             </section>
 
             <div class="mobile-actions">
-              <button type="button" onclick={() => onaddchild?.(row.id)} disabled={row.depth >= 3}>Child</button>
+              <button type="button" onclick={() => onaddchild?.(row.id)} disabled={row.depth >= MAX_DEPTH}>Child</button>
               <button type="button" onclick={() => onaddsibling?.(row.id)}>Sibling</button>
               <button type="button" onclick={() => onduplicate?.(row.id)}>Duplicate</button>
               <button type="button" onclick={() => onfocus?.(row.id)}>Focus</button>
