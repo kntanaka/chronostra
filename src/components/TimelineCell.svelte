@@ -2,6 +2,8 @@
   import { tick } from 'svelte';
   import type { CellNavigationDirection, TimelineEntry } from '../types';
 
+  const EDITOR_OFFSET = 0;
+
   let {
     entry,
     onpopup,
@@ -80,8 +82,8 @@
     if (!shellEl) return;
     const rect = shellEl.getBoundingClientRect();
     const anchorRect = getFixedAnchorRect(shellEl);
-    editorTop = rect.top - anchorRect.top + 4;
-    editorLeft = rect.left - anchorRect.left + 4;
+    editorTop = rect.top - anchorRect.top + EDITOR_OFFSET;
+    editorLeft = rect.left - anchorRect.left + EDITOR_OFFSET;
     editorWidth = Math.min(rect.width + 28, 360);
   }
 
@@ -127,8 +129,8 @@
       if (!shellEl || !inputEl) return;
       const desired = shellEl.getBoundingClientRect();
       const actual = inputEl.getBoundingClientRect();
-      editorTop += desired.top + 4 - actual.top;
-      editorLeft += desired.left + 4 - actual.left;
+      editorTop += desired.top + EDITOR_OFFSET - actual.top;
+      editorLeft += desired.left + EDITOR_OFFSET - actual.left;
     });
   }
 

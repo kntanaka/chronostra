@@ -121,6 +121,7 @@
     showRowBorders: initialShowRowBorders = true,
     showSummaryMeta = false,
     zenMode: initialZenMode = false,
+    isMobileApp = false,
     sourcePath = '',
     onExpandChange,
     onDataChange,
@@ -136,6 +137,7 @@
     showRowBorders?: boolean;
     showSummaryMeta?: boolean;
     zenMode?: boolean;
+    isMobileApp?: boolean;
     sourcePath?: string;
     onExpandChange?: (expandedIds: string[]) => void;
     onDataChange?: (data: ChronoData) => void;
@@ -359,21 +361,7 @@
   let wrapperEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
-  let contentWidth = $state(1024);
-  const isMobileLayout = $derived(contentWidth <= 760);
-
-  $effect(() => {
-    if (!wrapperEl) return;
-
-    const updateWidth = () => {
-      contentWidth = wrapperEl?.clientWidth ?? 1024;
-    };
-    updateWidth();
-
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(wrapperEl);
-    return () => observer.disconnect();
-  });
+  const isMobileLayout = $derived(isMobileApp);
 
   function handleToggle(id: string) {
     treeState.toggle(id);
@@ -430,7 +418,7 @@
   }
 
   function snapshotData(): ChronoData {
-    return structuredClone(data);
+    return structuredClone($state.snapshot(data));
   }
 
   let undoStack = $state<ChronoData[]>([]);

@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf } from 'obsidian';
+import { ItemView, Platform, WorkspaceLeaf } from 'obsidian';
 import { mount, unmount } from 'svelte';
 import ChronoTable from './components/ChronoTable.svelte';
 import type ChronostraPlugin from './main';
@@ -74,6 +74,7 @@ export class ChronostraView extends ItemView {
         showRowBorders: this.plugin.settings.showRowBorders,
         showSummaryMeta: this.plugin.settings.showSummaryMeta,
         zenMode: this.plugin.settings.zenMode,
+        isMobileApp: Platform.isMobileApp,
         sourcePath: this.plugin.settings.targetFilePath,
         onExpandChange: (expandedIds: string[]) => {
           this.plugin.settings.expandedIds = expandedIds;
