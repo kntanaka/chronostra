@@ -762,7 +762,7 @@
   }
 
   function scopeForQuickCaptureType(type: QuickCaptureType): Scope {
-    if (type === 'goal') return 'goal';
+    if (type === 'goal') return 'vision';
     if (type === 'project') return 'goal';
     return 'step';
   }
@@ -1478,7 +1478,6 @@
   {#if isMobileLayout}
     <MobileChronoList
       rows={flatRows}
-      allRows={expandedRows}
       {showSummaryMeta}
       {timelineStartYear}
       {timelineEndYear}
