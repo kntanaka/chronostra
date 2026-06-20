@@ -68,6 +68,7 @@ export interface TreeNode {
 export interface FlatRow {
   id: string;
   label: string;
+  path: string[];
   depth: number;
   scope?: Scope;
   commitment?: Commitment;

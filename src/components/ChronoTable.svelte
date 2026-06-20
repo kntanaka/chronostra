@@ -16,6 +16,8 @@
   type CommitmentFilter = 'all' | Commitment;
   type NoteFilter = 'all' | 'linked' | 'unlinked';
   type RowMenuState = { id: string; x: number; y: number } | null;
+  type QuickCaptureType = 'task' | 'idea' | 'project' | 'goal';
+  type QuickCaptureDraft = { label: string; type: QuickCaptureType };
 
   interface TemplateDraft {
     label: string;
@@ -30,6 +32,7 @@
 
   const ROW_HEIGHT = 64;
   const HISTORY_LIMIT = 50;
+  const INBOX_CATEGORY_LABEL = '90 Inbox';
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
   const STATUS_FILTER_OPTIONS = [
     { value: 'all', label: 'All status' },
@@ -750,6 +753,20 @@
     };
   }
 
+  function isInboxCategory(label: string): boolean {
+    return /^90(\b|[\s_-])/i.test(label.trim());
+  }
+
+  function findInboxCategory(): TreeNode | undefined {
+    return data.categories.find((category) => isInboxCategory(category.label));
+  }
+
+  function scopeForQuickCaptureType(type: QuickCaptureType): Scope {
+    if (type === 'goal') return 'goal';
+    if (type === 'project') return 'goal';
+    return 'step';
+  }
+
   function cloneNode(node: TreeNode, isRoot = true): TreeNode {
     return {
       ...structuredClone(node),
@@ -778,6 +795,34 @@
       return true;
     });
     pendingEditId = newNode.id;
+  }
+
+  function quickCaptureToInbox(draft: QuickCaptureDraft) {
+    const label = draft.label.trim();
+    if (!label) return;
+
+    const newId = generateId();
+    commitMutation(() => {
+      let inbox = findInboxCategory();
+      if (!inbox) {
+        inbox = createNode(INBOX_CATEGORY_LABEL, 0);
+        data.categories.push(inbox);
+      }
+
+      if (!inbox.children) inbox.children = [];
+
+      const item = createNode(label, 1);
+      item.id = newId;
+      item.scope = scopeForQuickCaptureType(draft.type);
+      item.status = 'todo';
+      inbox.children.unshift(item);
+      treeState.expand(inbox.id);
+      return true;
+    });
+
+    selectedCategoryIds = [];
+    focusId = null;
+    pendingEditId = newId;
   }
 
   function addChild(parentId: string) {
@@ -1165,7 +1210,12 @@
   onkeydown={handleWindowKeydown}
 />
 
-<div class="chrono-wrapper" class:is-dragging={!!dragState} bind:this={wrapperEl}>
+<div
+  class="chrono-wrapper"
+  class:is-dragging={!!dragState}
+  class:is-mobile-layout={isMobileLayout}
+  bind:this={wrapperEl}
+>
   <div class="sticky-chrome">
     <div class="toolbar" class:mobile-toolbar={isMobileLayout} class:zen-toolbar={zenMode}>
       {#if zenMode}
@@ -1203,7 +1253,7 @@
           {#if saveIndicator}
             <span class="save-indicator">Saved</span>
           {/if}
-          <button class="add-btn" onclick={addCategory}>+ Add</button>
+          <button class="add-btn" onclick={addCategory}>+ Category</button>
         </div>
 
         <input
@@ -1428,6 +1478,7 @@
   {#if isMobileLayout}
     <MobileChronoList
       rows={flatRows}
+      allRows={expandedRows}
       {showSummaryMeta}
       {timelineStartYear}
       {timelineEndYear}
@@ -1441,6 +1492,7 @@
       onaddsibling={addSibling}
       onduplicate={duplicateRow}
       ondelete={deleteRow}
+      onquickcapture={quickCaptureToInbox}
       onfocus={(id) => { selectedCategoryIds = []; focusId = id; }}
       onnoteclick={(id) => { void handleNoteClick(id); }}
       onunlinknote={unlinkNote}
@@ -1604,10 +1656,15 @@
     overflow: visible;
     position: relative;
   }
-  :global(.workspace-leaf-content[data-type="chronostra"]) .chrono-wrapper {
+  :global(.workspace-leaf-content[data-type="chronostra-view"]) .chrono-wrapper {
     height: 100%;
     min-height: 0;
     overflow: hidden;
+  }
+  :global(.workspace-leaf-content[data-type="chronostra-view"]) .chrono-wrapper.is-mobile-layout {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .chrono-wrapper.is-dragging {
     cursor: grabbing;
@@ -2039,7 +2096,7 @@
     position: relative;
     z-index: 0;
   }
-  :global(.workspace-leaf-content[data-type="chronostra"]) .scroll-container {
+  :global(.workspace-leaf-content[data-type="chronostra-view"]) .scroll-container {
     flex: 1 1 auto;
     min-height: 0;
   }
