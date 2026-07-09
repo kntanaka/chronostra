@@ -53,16 +53,36 @@
   let captureOpen = $state(false);
   let captureText = $state('');
   let captureType = $state<QuickCaptureType>('task');
+  let actionRowId = $state<string | null>(null);
+  let swipedRowId = $state<string | null>(null);
+  let suppressNextClickId = $state<string | null>(null);
+  let rowGesture = $state<{
+    id: string;
+    startX: number;
+    startY: number;
+    moved: boolean;
+    longPressTimer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const startYear = $derived(Math.min(timelineStartYear, timelineEndYear));
   const endYear = $derived(Math.max(timelineStartYear, timelineEndYear));
   const todayRows = $derived(allRows.filter(isTodayCandidate).slice(0, 6));
   const inboxRows = $derived(allRows.filter(isInboxRow));
   const planRows = $derived(rows.filter((row) => !isInboxRow(row)));
+  const actionRow = $derived(actionRowId ? allRows.find((row) => row.id === actionRowId) : undefined);
 
   function toggleDetails(id: string) {
     openRowId = openRowId === id ? null : id;
     confirmDeleteId = null;
+    swipedRowId = null;
+  }
+
+  function handleLabelClick(row: FlatRow, action: () => void) {
+    if (suppressNextClickId === row.id) {
+      suppressNextClickId = null;
+      return;
+    }
+    action();
   }
 
   function commitLabel(row: FlatRow, value: string) {
@@ -94,9 +114,19 @@
     if (confirmDeleteId === id) {
       ondelete?.(id);
       confirmDeleteId = null;
+      actionRowId = null;
+      swipedRowId = null;
       return;
     }
     confirmDeleteId = id;
+  }
+
+  function deleteImmediately(id: string) {
+    ondelete?.(id);
+    if (openRowId === id) openRowId = null;
+    if (confirmDeleteId === id) confirmDeleteId = null;
+    if (actionRowId === id) actionRowId = null;
+    if (swipedRowId === id) swipedRowId = null;
   }
 
   function scopeLabel(row: FlatRow): string {
@@ -164,6 +194,75 @@
     captureType = 'task';
     captureOpen = false;
   }
+
+  function isGestureIgnored(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement && !!target.closest(
+      'input, textarea, select, .mobile-check, .mobile-disclosure, .mobile-swipe-delete, .mobile-actions, .mobile-capture-button'
+    );
+  }
+
+  function clearRowGesture() {
+    if (rowGesture) {
+      clearTimeout(rowGesture.longPressTimer);
+      rowGesture = null;
+    }
+  }
+
+  function handleRowPointerDown(e: PointerEvent, row: FlatRow) {
+    if (e.pointerType === 'mouse' || isGestureIgnored(e.target)) return;
+    clearRowGesture();
+    const timer = setTimeout(() => {
+      actionRowId = row.id;
+      swipedRowId = null;
+      suppressNextClickId = row.id;
+      confirmDeleteId = null;
+      if ('vibrate' in navigator) navigator.vibrate?.(8);
+    }, 520);
+    rowGesture = {
+      id: row.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      longPressTimer: timer,
+    };
+  }
+
+  function handleRowPointerMove(e: PointerEvent, row: FlatRow) {
+    if (!rowGesture || rowGesture.id !== row.id) return;
+    const dx = e.clientX - rowGesture.startX;
+    const dy = e.clientY - rowGesture.startY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      rowGesture.moved = true;
+      clearTimeout(rowGesture.longPressTimer);
+    }
+    if (Math.abs(dy) > 36) return;
+    if (dx < -44) {
+      swipedRowId = row.id;
+      confirmDeleteId = null;
+    } else if (dx > 24 && swipedRowId === row.id) {
+      swipedRowId = null;
+    }
+  }
+
+  function handleRowPointerUp() {
+    clearRowGesture();
+  }
+
+  function closeActionSheet() {
+    suppressNextClickId = null;
+    actionRowId = null;
+    confirmDeleteId = null;
+  }
+
+  function handleActionBackdropClick(e: MouseEvent) {
+    if (e.currentTarget === e.target) closeActionSheet();
+  }
+
+  function runAction(action: () => void) {
+    action();
+    closeActionSheet();
+    swipedRowId = null;
+  }
 </script>
 
 <div class="mobile-list">
@@ -174,7 +273,20 @@
     </div>
     {#if todayRows.length > 0}
       {#each todayRows as row (row.id)}
-        <article class="mobile-row mobile-row-compact kind-{rowKind(row)}" style:--depth={Math.min(row.depth, 2)}>
+        <article
+          class="mobile-row mobile-row-compact kind-{rowKind(row)}"
+          class:is-swiped={swipedRowId === row.id}
+          style:--depth={Math.min(row.depth, 2)}
+          onpointerdown={(e) => handleRowPointerDown(e, row)}
+          onpointermove={(e) => handleRowPointerMove(e, row)}
+          onpointerup={handleRowPointerUp}
+          onpointercancel={handleRowPointerUp}
+        >
+          <button type="button" class="mobile-swipe-delete" aria-label="Delete" onclick={() => deleteImmediately(row.id)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z" />
+            </svg>
+          </button>
           <button
             type="button"
             class="mobile-check"
@@ -186,7 +298,7 @@
             }}
           ></button>
           <div class="mobile-row-body">
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
+            <button type="button" class="mobile-label-button" onclick={() => handleLabelClick(row, () => onfocus?.(row.id))}>
               {row.label}
             </button>
             <div class="mobile-row-meta">{metaText(row)}</div>
@@ -210,9 +322,19 @@
       {#each inboxRows as row (row.id)}
         <article
           class="mobile-row kind-{rowKind(row)}"
+          class:is-swiped={swipedRowId === row.id}
           class:kind-category={row.depth === 0}
           style:--depth={Math.max(row.depth - 1, 0)}
+          onpointerdown={(e) => handleRowPointerDown(e, row)}
+          onpointermove={(e) => handleRowPointerMove(e, row)}
+          onpointerup={handleRowPointerUp}
+          onpointercancel={handleRowPointerUp}
         >
+          <button type="button" class="mobile-swipe-delete" aria-label="Delete" onclick={() => deleteImmediately(row.id)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z" />
+            </svg>
+          </button>
           {#if row.depth > 0}
             <button
               type="button"
@@ -232,7 +354,7 @@
               <span>{scopeLabel(row)}</span>
               <span>{row.status ?? 'todo'}</span>
             </div>
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
+            <button type="button" class="mobile-label-button" onclick={() => handleLabelClick(row, () => onfocus?.(row.id))}>
               {row.label}
             </button>
             {#if row.depth > 0}
@@ -271,9 +393,19 @@
       <article
         class="mobile-row kind-{rowKind(row)}"
         class:is-open={isOpen}
+        class:is-swiped={swipedRowId === row.id}
         class:kind-category={row.depth === 0}
         style:--depth={Math.min(row.depth, 2)}
+        onpointerdown={(e) => handleRowPointerDown(e, row)}
+        onpointermove={(e) => handleRowPointerMove(e, row)}
+        onpointerup={handleRowPointerUp}
+        onpointercancel={handleRowPointerUp}
       >
+        <button type="button" class="mobile-swipe-delete" aria-label="Delete" onclick={() => deleteImmediately(row.id)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z" />
+          </svg>
+        </button>
         {#if row.depth > 0}
           <button
             type="button"
@@ -297,7 +429,7 @@
               <span>{row.commitment}</span>
             {/if}
           </div>
-          <button type="button" class="mobile-label-button" onclick={() => toggleDetails(row.id)}>
+          <button type="button" class="mobile-label-button" onclick={() => handleLabelClick(row, () => toggleDetails(row.id))}>
             {row.label}
           </button>
           <div class="mobile-row-meta">{metaText(row)}</div>
@@ -483,6 +615,46 @@
   </div>
 {/if}
 
+{#if actionRow}
+  <div class="mobile-action-backdrop" role="presentation" onclick={handleActionBackdropClick}>
+    <div class="mobile-action-sheet" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="mobile-action-title">
+        <span>{actionRow.label}</span>
+        <button type="button" aria-label="Close" onclick={closeActionSheet}>Close</button>
+      </div>
+      <button
+        type="button"
+        disabled={actionRow.depth >= MAX_DEPTH}
+        onclick={() => runAction(() => onaddchild?.(actionRow.id))}
+      >
+        Add child
+      </button>
+      <button type="button" onclick={() => runAction(() => onaddsibling?.(actionRow.id))}>
+        Add sibling
+      </button>
+      <button type="button" onclick={() => runAction(() => onduplicate?.(actionRow.id))}>
+        Duplicate
+      </button>
+      <button type="button" onclick={() => runAction(() => onfocus?.(actionRow.id))}>
+        Focus
+      </button>
+      {#if onnoteclick}
+        <button type="button" onclick={() => runAction(() => onnoteclick(actionRow.id))}>
+          {actionRow.notePath ? 'Open note' : 'Create note'}
+        </button>
+      {/if}
+      {#if actionRow.notePath && onunlinknote}
+        <button type="button" onclick={() => runAction(() => onunlinknote(actionRow.id))}>
+          Unlink note
+        </button>
+      {/if}
+      <button type="button" class="danger" onclick={() => requestDelete(actionRow.id)}>
+        {confirmDeleteId === actionRow.id ? 'Tap again to delete' : 'Delete'}
+      </button>
+    </div>
+  </div>
+{/if}
+
 <style>
   .mobile-list {
     display: flex;
@@ -527,6 +699,7 @@
 
   .mobile-row {
     --indent: calc(var(--depth) * 16px);
+    position: relative;
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) auto;
     column-gap: 6px;
@@ -534,7 +707,13 @@
     border-bottom: 1px solid var(--background-modifier-border);
     padding: 8px 8px 8px calc(12px + var(--indent));
     background: var(--chronostra-bg-goal);
-    transition: background 0.08s ease;
+    overflow: hidden;
+    touch-action: pan-y;
+    transition: background 0.08s ease, padding-right 0.14s ease;
+  }
+
+  .mobile-row.is-swiped {
+    padding-right: 76px;
   }
 
   .mobile-row:hover,
@@ -570,6 +749,35 @@
     grid-template-columns: 24px minmax(0, 1fr) auto;
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+
+  .mobile-swipe-delete {
+    appearance: none;
+    -webkit-appearance: none;
+    position: absolute;
+    top: 0;
+    right: -64px;
+    bottom: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    border: none;
+    border-radius: 0;
+    background: var(--text-error);
+    color: var(--background-primary);
+    box-shadow: none;
+    transition: right 0.14s ease;
+  }
+
+  .mobile-row.is-swiped .mobile-swipe-delete {
+    right: 0;
+  }
+
+  .mobile-swipe-delete svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
   }
 
   .mobile-row-body {
@@ -821,6 +1029,7 @@
   .mobile-add-timeline button,
   .mobile-actions button,
   .mobile-capture-heading button,
+  .mobile-action-title button,
   .mobile-capture-empty,
   .mobile-capture-save {
     appearance: none;
@@ -924,18 +1133,36 @@
     background: color-mix(in srgb, var(--background-primary) 30%, transparent);
   }
 
-  .mobile-capture-sheet {
+  .mobile-action-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1350;
+    display: flex;
+    align-items: flex-end;
+    background: color-mix(in srgb, var(--background-primary) 34%, transparent);
+  }
+
+  .mobile-capture-sheet,
+  .mobile-action-sheet {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
     padding: 10px 12px calc(var(--safe-area-inset-bottom, 0px) + 12px);
     border-top: 1px solid var(--background-modifier-border);
     border-radius: 0;
     background: var(--background-primary);
   }
 
-  .mobile-capture-heading {
+  .mobile-capture-sheet {
+    gap: 10px;
+  }
+
+  .mobile-action-sheet {
+    gap: 0;
+  }
+
+  .mobile-capture-heading,
+  .mobile-action-title {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -945,10 +1172,46 @@
     font-weight: 600;
   }
 
-  .mobile-capture-heading button {
+  .mobile-action-title {
+    min-height: 34px;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .mobile-action-title span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-capture-heading button,
+  .mobile-action-title button {
     min-height: 26px;
     padding: 0 8px;
     border-color: transparent;
+  }
+
+  .mobile-action-sheet > button {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 44px;
+    border: none;
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-normal);
+    box-shadow: none;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .mobile-action-sheet > button:disabled {
+    color: var(--text-faint);
+  }
+
+  .mobile-action-sheet > button.danger {
+    color: var(--text-error);
   }
 
   .mobile-capture-controls {
