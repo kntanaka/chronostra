@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { CellNavigationDirection, TimelineEntry } from '../types';
+  import { insertTextAreaLineBreak, shouldInsertCellLineBreak } from '../keyboard';
 
   const EDITOR_OFFSET = 0;
 
@@ -163,7 +164,12 @@
       e.preventDefault();
       commitEdit();
       onnavigate?.(e.shiftKey ? 'left' : 'right');
-    } else if (e.key === 'Enter' && !e.altKey) {
+    } else if (shouldInsertCellLineBreak(e) && inputEl) {
+      e.preventDefault();
+      e.stopPropagation();
+      editValue = insertTextAreaLineBreak(inputEl, editValue);
+      resizeEditor();
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       commitEdit();
       onnavigate?.(e.shiftKey ? 'up' : 'down');
@@ -308,9 +314,9 @@
     -webkit-line-clamp: 3;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: normal;
     word-break: break-word;
     line-height: 1.4;
+    white-space: pre-wrap;
     min-width: 0;
   }
   .timeline-input {

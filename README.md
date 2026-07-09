@@ -43,7 +43,7 @@ Chronostra refuses both compromises. Every row is a **goal**. Goals differ by *s
 Chronostra renders a single `future-data` code block as a full-width interactive table. Every row carries:
 
 - A **label** (the goal itself, e.g. "Travel every prefecture in Japan")
-- A **scope** — Vision, Goal, or Step (see below)
+- An optional **scope** for visual weight, or a depth-based default when omitted
 - A **commitment** — Must ★ or Wish ☆ (optional)
 - Three metric columns — **Future** (where you want to be), **Now** (where you are), and **Gap** (the delta)
 - A **timeline** spanning the years you choose (default 2025–2050)
@@ -52,9 +52,9 @@ Use it for yearly planning, career roadmaps, learning plans, travel goals, healt
 
 ## Core Concepts
 
-### Scope — how big a dream
+### Scope — visual weight, not a required hierarchy
 
-Every goal is sized into one of three layers:
+Rows can be sized into one of three visual layers:
 
 | Scope | Meaning | Example |
 |---|---|---|
@@ -62,7 +62,7 @@ Every goal is sized into one of three layers:
 | **Goal** | A multi-year objective that supports a Vision (or stands alone). | "Visit 30 of 47 prefectures by 2030" |
 | **Step** | A concrete, achievable goal — months to a year. | "Go to Amami Ōshima this summer" |
 
-A Vision can nest Goals beneath it, which can nest Steps. But you can **skip levels** — a single Step can sit directly under a Category (e.g. "Stretch every morning") without any Vision parent. Scope is decoupled from depth: depth gives the tree, scope gives the visual weight.
+You do not have to model your life as exactly Vision → Goal → Step. A single Step can sit directly under a Category (e.g. "Stretch every morning"), and a Goal can stand alone without a Vision parent. Scope is decoupled from depth: depth gives the tree, scope gives the visual weight.
 
 ### Commitment — how seriously you mean it
 

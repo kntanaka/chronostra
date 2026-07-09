@@ -80,14 +80,14 @@ code.chronostra-sticky-overflow-reset,
   border-radius: 0;
 }
 
-.workspace-leaf-content[data-type="chronostra"] .chronostra-view-content,
+.workspace-leaf-content[data-type="chronostra-view"] .chronostra-view-content,
 .chronostra-view-content.chronostra-container,
 .chronostra-view-content {
   padding: 0;
   overflow: visible;
 }
 
-.workspace-leaf-content[data-type="chronostra"] .chronostra-view-content {
+.workspace-leaf-content[data-type="chronostra-view"] .chronostra-view-content {
   height: 100%;
   min-height: 0;
   overflow: hidden;
