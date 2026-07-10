@@ -40,8 +40,8 @@ export class ChronostraSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('Open Chronostra view')
-      .setDesc('Dedicated table pane (ribbon icon or command palette: Open Chronostra)')
+      .setName('Open chronostra view')
+      .setDesc('Dedicated table pane (ribbon icon or command palette: Open chronostra)')
       .addButton((button) =>
         button.setButtonText('Open').onClick(() => {
           void this.plugin.activateView().catch((error: unknown) => {
