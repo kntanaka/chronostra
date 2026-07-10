@@ -117,7 +117,7 @@ export default class ChronostraPlugin extends Plugin {
         (leaf) => new ChronostraView(leaf, this)
       );
 
-      this.addRibbonIcon('table', 'Open Chronostra', () => {
+      this.addRibbonIcon('table', 'Open chronostra', () => {
         void this.activateView().catch((error: unknown) => {
           console.error('Chronostra: Failed to activate view from ribbon', error);
         });
