@@ -164,6 +164,30 @@
     captureType = 'task';
     captureOpen = false;
   }
+
+  function syncCaptureViewport(node: HTMLElement) {
+    const viewport = window.visualViewport;
+
+    const update = () => {
+      const top = viewport?.offsetTop ?? 0;
+      const height = viewport?.height ?? window.innerHeight;
+      node.style.setProperty('--capture-viewport-top', `${top}px`);
+      node.style.setProperty('--capture-viewport-height', `${height}px`);
+    };
+
+    update();
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+
+    return {
+      destroy() {
+        viewport?.removeEventListener('resize', update);
+        viewport?.removeEventListener('scroll', update);
+        window.removeEventListener('resize', update);
+      },
+    };
+  }
 </script>
 
 <div class="mobile-list">
@@ -436,15 +460,14 @@
 
   <div class="mobile-capture-dock">
     <button type="button" class="mobile-capture-button" onclick={() => { captureOpen = true; }}>
-      <span>+</span>
-      <strong>Capture</strong>
-      <small>90 Inbox</small>
+      <span aria-hidden="true">+</span>
+      <strong>New Item</strong>
     </button>
   </div>
 </div>
 
 {#if captureOpen}
-  <div class="mobile-capture-backdrop" role="presentation">
+  <div class="mobile-capture-backdrop" role="presentation" use:syncCaptureViewport>
     <form
       class="mobile-capture-sheet"
       onsubmit={(e) => {
@@ -880,6 +903,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-content: center;
     padding: 0 8px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 0;
@@ -887,7 +911,7 @@
     color: var(--text-muted);
     box-shadow: none;
     font: inherit;
-    text-align: left;
+    text-align: center;
   }
 
   .mobile-capture-button span {
@@ -908,27 +932,29 @@
     line-height: 1.2;
   }
 
-  .mobile-capture-button small {
-    margin-left: auto;
-    color: var(--text-faint);
-    font-size: 10px;
-    line-height: 1.2;
-  }
-
   .mobile-capture-backdrop {
     position: fixed;
-    inset: 0;
+    top: var(--capture-viewport-top, 0px);
+    right: 0;
+    left: 0;
+    height: var(--capture-viewport-height, 100dvh);
     z-index: 1300;
     display: flex;
     align-items: flex-end;
+    overflow: hidden;
     background: color-mix(in srgb, var(--background-primary) 30%, transparent);
   }
 
   .mobile-capture-sheet {
     width: 100%;
+    box-sizing: border-box;
+    max-height: calc(var(--capture-viewport-height, 100dvh) - 8px);
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 12px;
     padding: 10px 12px calc(var(--safe-area-inset-bottom, 0px) + 12px);
     border-top: 1px solid var(--background-modifier-border);
     border-radius: 0;
