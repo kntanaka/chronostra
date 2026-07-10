@@ -1,11 +1,12 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type { CellNavigationDirection, FlatRow } from '../types';
+  import { insertTextAreaLineBreak, shouldInsertCellLineBreak } from '../keyboard';
   import ExpandToggle from './ExpandToggle.svelte';
 
   const EDITOR_OFFSET = 0;
 
-  let { row, width, showSummaryMeta = false, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onnoteclick, onnavigate }: {
+  let { row, width, showSummaryMeta = false, autoEdit, isDragging, ontoggle, onlabelchange, onautoedited, ondragstart, onaddchild, onnavigate }: {
     row: FlatRow;
     width: number;
     showSummaryMeta?: boolean;
@@ -15,7 +16,7 @@
     onlabelchange?: (id: string, newLabel: string) => void;
     onautoedited?: () => void;
     ondragstart?: (e: PointerEvent) => void;
-    onnoteclick?: () => void;
+    onaddchild?: () => void;
     onnavigate?: (direction: CellNavigationDirection) => void;
   } = $props();
 
@@ -152,7 +153,12 @@
       e.preventDefault();
       commitEdit();
       onnavigate?.(e.shiftKey ? 'left' : 'right');
-    } else if (e.key === 'Enter' && !e.altKey) {
+    } else if (shouldInsertCellLineBreak(e) && inputEl) {
+      e.preventDefault();
+      e.stopPropagation();
+      editValue = insertTextAreaLineBreak(inputEl, editValue);
+      resizeEditor();
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       commitEdit();
       onnavigate?.(e.shiftKey ? 'up' : 'down');
@@ -244,17 +250,16 @@
           onclick={startEdit}
           onkeydown={handleStartEditKeydown}
         >{row.label}</button>
-        {#if onnoteclick}
+        {#if onaddchild}
           <button
-            class="note-link"
-            class:is-linked={!!row.notePath}
-            title={row.notePath ? row.notePath : 'Create note'}
+            class="inline-add-child"
+            title="Add child"
             onclick={(e) => {
               e.stopPropagation();
-              onnoteclick();
+              onaddchild();
             }}
           >
-            {row.notePath ? 'note' : '+'}
+            +
           </button>
         {/if}
       </div>
@@ -343,7 +348,7 @@
     line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: normal;
+    white-space: pre-wrap;
     word-break: break-word;
     color: inherit;
     font: inherit;
@@ -381,7 +386,7 @@
     outline: none !important;
     box-shadow: none !important;
   }
-  .note-link {
+  .inline-add-child {
     appearance: none;
     -webkit-appearance: none;
     font-family: inherit;
@@ -400,13 +405,10 @@
     box-shadow: none;
     transition: color 0.1s, background 0.1s;
   }
-  .hierarchy-cell:hover .note-link {
+  .hierarchy-cell:hover .inline-add-child {
     color: var(--text-faint);
   }
-  .note-link.is-linked {
-    color: var(--interactive-accent);
-  }
-  .note-link:hover {
+  .inline-add-child:hover {
     color: var(--text-normal) !important;
     background: var(--background-modifier-hover, var(--background-secondary));
   }

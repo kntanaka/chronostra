@@ -1505,6 +1505,7 @@
   {#if isMobileLayout}
     <MobileChronoList
       rows={flatRows}
+      allRows={expandedRows}
       {showSummaryMeta}
       {timelineStartYear}
       {timelineEndYear}
@@ -1582,7 +1583,7 @@
               onrowcontextmenu={handleRowContextMenu}
               onautoedited={clearEditTarget}
               ondragstart={handleDragStart}
-              onnoteclick={handleNoteClick}
+              onaddchild={addChild}
               oncommitmentchange={handleCommitmentChange}
               onnavigate={handleCellNavigate}
             />
@@ -1601,6 +1602,9 @@
           style:top="{rowMenu.y}px"
           onpointerdown={(e) => e.stopPropagation()}
         >
+          <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
+            + Add sibling
+          </button>
           <button
             type="button"
             class="context-item"
@@ -1608,9 +1612,6 @@
             onclick={() => { addChild(rowMenu!.id); closeRowMenu(); }}
           >
             + Add child
-          </button>
-          <button type="button" class="context-item" onclick={() => { addSibling(rowMenu!.id); closeRowMenu(); }}>
-            + Add sibling
           </button>
           <button type="button" class="context-item" onclick={() => { duplicateRow(rowMenu!.id); closeRowMenu(); }}>
             Duplicate subtree
@@ -2191,10 +2192,10 @@
     background: none;
   }
   .context-item.danger {
-    color: var(--text-muted);
+    color: var(--text-error);
   }
   .context-item.danger:hover {
-    color: var(--text-normal);
+    color: var(--text-error);
   }
   .context-item-active {
     color: var(--interactive-accent);

@@ -9,7 +9,7 @@
 
   import type { Commitment } from '../types';
 
-  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, showSummaryMeta = false, autoEditColumn, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onnoteclick, oncommitmentchange, onnavigate }: {
+  let { row, hierarchyWidth, metricWidths, metricFrozen, birthYear, focusYear, timelineStartYear, timelineEndYear, showSummaryMeta = false, autoEditColumn, isDragged, isDropTarget, dropPosition, justDropped, ontoggle, onpopup, onmetricchange, onstatuschange, onlabelchange, ontimelinechange, onrowcontextmenu, onautoedited, ondragstart, onaddchild, oncommitmentchange, onnavigate }: {
     row: FlatRow;
     hierarchyWidth: number;
     metricWidths: number[];
@@ -33,7 +33,7 @@
     onrowcontextmenu?: (e: MouseEvent, rowId: string) => void;
     onautoedited?: () => void;
     ondragstart?: (e: PointerEvent, rowId: string) => void;
-    onnoteclick?: (id: string) => void;
+    onaddchild?: (id: string) => void;
     oncommitmentchange?: (id: string, next: Commitment | undefined) => void;
     onnavigate?: (rowId: string, column: CellColumnKey, direction: CellNavigationDirection) => void;
   } = $props();
@@ -135,7 +135,7 @@
       {onlabelchange}
       {onautoedited}
       ondragstart={ondragstart ? (e) => ondragstart(e, row.id) : undefined}
-      onnoteclick={onnoteclick ? () => onnoteclick(row.id) : undefined}
+      onaddchild={onaddchild ? () => onaddchild(row.id) : undefined}
       onnavigate={(direction) => handleNavigate('hierarchy', direction)}
     />
   </div>
