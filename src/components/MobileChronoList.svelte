@@ -515,6 +515,10 @@
     background: var(--background-primary);
   }
 
+  :global(body.is-phone) .mobile-list {
+    padding-bottom: calc(56px + var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px));
+  }
+
   .mobile-section-group {
     display: flex;
     flex-direction: column;
@@ -892,6 +896,14 @@
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     pointer-events: auto;
+  }
+
+  :global(body.is-phone) .mobile-capture-dock {
+    bottom: max(
+      0px,
+      calc(var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px) - var(--keyboard-height, 0px) - 2px)
+    );
+    padding-bottom: 6px;
   }
 
   .mobile-capture-button {
