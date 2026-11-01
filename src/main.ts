@@ -1,3 +1,4 @@
+import { replaceFutureDataBlock } from './markdown-data';
 import type { SettingsChange } from './settings';
 import {
   Plugin,
@@ -286,8 +287,7 @@ export default class ChronostraPlugin extends Plugin {
     const newJson = JSON.stringify(flatItems, null, 2);
 
     await this.app.vault.process(file, (content: string) => {
-      const regex = /```future-data\s*\n[\s\S]*?\n```/;
-      return content.replace(regex, '```future-data\n' + newJson + '\n```');
+      return replaceFutureDataBlock(content, newJson);
     });
   }
 

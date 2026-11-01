@@ -1,3 +1,4 @@
+import { replaceFutureDataBlock } from './markdown-data';
 import { TFile, TAbstractFile } from 'obsidian';
 import type ChronostraPlugin from './main';
 import type { ChronoData } from './types';
@@ -56,7 +57,7 @@ export class DataProvider {
     const newJson = JSON.stringify(flatItems, null, 2);
 
     await this.plugin.app.vault.process(file, (content) => {
-      return this.replaceFutureDataBlock(content, newJson);
+      return replaceFutureDataBlock(content, newJson);
     });
 
     this.lastWriteTime = Date.now();
@@ -86,10 +87,5 @@ export class DataProvider {
     const regex = /```future-data\s*\n([\s\S]*?)\n```/;
     const match = content.match(regex);
     return match ? match[1].trim() : null;
-  }
-
-  private replaceFutureDataBlock(content: string, newJson: string): string {
-    const regex = /```future-data\s*\n[\s\S]*?\n```/;
-    return content.replace(regex, '```future-data\n' + newJson + '\n```');
   }
 }
