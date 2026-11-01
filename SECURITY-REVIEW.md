@@ -41,3 +41,27 @@ now respects `OBSIDIAN_VAULT`, as does `link:vault`. Historical commits are unch
 The preview is sample-only and binds to 127.0.0.1; dev/test files are not release assets.
 This review does not certify all possible vulnerabilities or third-party host behavior.
 No release or tag was created as part of this work.
+
+## Follow-up data integrity fixes (local verification)
+
+The subsequent deeper review found five additional integrity issues; the earlier
+review alone was not sufficient to declare release readiness. This change addresses:
+
+- Invalid or missing source data now raises a load error and cannot be saved as empty data.
+  Structural validation also rejects duplicate IDs/paths, missing parents and malformed plans.
+- Saves are queued and compare the loaded JSON with the current JSON inside `vault.process`.
+  Conflicts reject the save and retain local edits; external changes are not dropped for 500 ms.
+- Multiple `future-data` blocks are explicitly rejected before editing and again at save.
+  Editing multiple blocks in one note is intentionally not supported yet.
+- Failed saves no longer wedge a suppression flag. UI success waits for persistence;
+  errors offer retry, and unsubmitted drafts are not silently replaced by a view remount.
+- Plugin installation stages the three release assets, preserves `data.json`, and leaves
+  installed assets intact if any source asset is missing before replacement starts.
+
+`npm test` now includes real DataProvider code with a stubbed Obsidian host, delayed
+writes, rejected writes, queued edits, external changes, invalid sources, and a
+filesystem-backed host checking original bytes and successful reload after recovery.
+Installer tests use disposable directories and check both settings preservation and
+failed staging. These tests do not guarantee all OS/filesystem failures: replacing the
+three staged assets is not a single multi-file atomic transaction, and filesystem
+writers outside Obsidian's `vault.process` contract cannot be globally locked here.

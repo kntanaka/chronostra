@@ -1,91 +1,79 @@
-import { replaceFutureDataBlock } from './markdown-data';
+import { parseFlatItems, readFutureDataBlock, replaceFutureDataBlock } from './markdown-data';
 import { TFile, TAbstractFile } from 'obsidian';
 import type ChronostraPlugin from './main';
 import type { ChronoData } from './types';
 import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
-import type { FlatItem } from './types';
 
+/** Serializes saves and checks the disk version inside vault.process. */
 export class DataProvider {
-  private plugin: ChronostraPlugin;
-  private lastWriteTime = 0;
-  private writeDebounceMs = 500;
-  private isSaving = false;
+  private baseline: string | null = null;
+  private revision = 0;
+  private failedSave = false;
+  private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(plugin: ChronostraPlugin) {
-    this.plugin = plugin;
+  constructor(private plugin: ChronostraPlugin, private sourcePath = plugin.settings.targetFilePath) {}
+
+  private file(): TFile {
+    const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
+    if (!(file instanceof TFile)) throw new Error('Plan file is missing. Original data was not changed.');
+    return file;
   }
 
-  private getTargetFile(): TFile | null {
-    const path = this.plugin.settings.targetFilePath;
-    const file = this.plugin.app.vault.getAbstractFileByPath(path);
-    return file instanceof TFile ? file : null;
+  private enqueue<T>(action: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(action);
+    this.queue = result.catch(() => undefined);
+    return result;
   }
 
-  /** Load data from the markdown file's future-data code block */
-  async load(): Promise<ChronoData> {
-    const file = this.getTargetFile();
-    if (!file) {
-      return { categories: [] };
-    }
+  load(): Promise<ChronoData> {
+    return this.enqueue(async () => {
+      this.baseline = null;
+      this.revision++;
+      const json = readFutureDataBlock(await this.plugin.app.vault.read(this.file()));
+      const data = buildTreeFromFlatItems(parseFlatItems(json));
+      this.baseline = json;
+      this.failedSave = false;
+      return data;
+    });
+  }
 
-    const content = await this.plugin.app.vault.read(file);
-    const json = this.extractFutureDataBlock(content);
-    if (!json) {
-      return { categories: [] };
-    }
+  /** A rendered code block supplies its own initial source, verified again on save. */
+  initialize(json: string): ChronoData {
+    const data = buildTreeFromFlatItems(parseFlatItems(json));
+    this.baseline = json.trim();
+    return data;
+  }
 
-    try {
-      const parsed = JSON.parse(json) as unknown;
-      if (!Array.isArray(parsed)) {
-        return { categories: [] };
+  save(data: ChronoData): Promise<void> {
+    const revision = this.revision;
+    const json = JSON.stringify(flattenTreeToItems(data), null, 2);
+    return this.enqueue(async () => {
+      try {
+        if (this.baseline === null || revision !== this.revision) throw new Error('Plan changed or could not be loaded. Reopen it before saving.');
+        parseFlatItems(json);
+        await this.plugin.app.vault.process(this.file(), content => {
+          if (readFutureDataBlock(content) !== this.baseline) throw new Error('Plan changed outside this view. Your edits are still here; the file was not overwritten.');
+          return replaceFutureDataBlock(content, json);
+        });
+        this.baseline = json;
+        this.failedSave = false;
+      } catch (error) {
+        this.failedSave = true;
+        throw error;
       }
-      const flatItems = parsed as FlatItem[];
-      return buildTreeFromFlatItems(flatItems);
-    } catch (_e) {
-      console.error('Chronostra: Failed to parse future-data JSON', _e);
-      return { categories: [] };
-    }
-  }
-
-  /** Save data back to the markdown file's future-data code block */
-  async save(data: ChronoData): Promise<void> {
-    const file = this.getTargetFile();
-    if (!file) return;
-
-    this.isSaving = true;
-    const flatItems = flattenTreeToItems(data);
-    const newJson = JSON.stringify(flatItems, null, 2);
-
-    await this.plugin.app.vault.process(file, (content) => {
-      return replaceFutureDataBlock(content, newJson);
-    });
-
-    this.lastWriteTime = Date.now();
-    (window.activeWindow ?? window).setTimeout(() => {
-      this.isSaving = false;
-    }, this.writeDebounceMs);
-  }
-
-  /** Handle external file changes for bidirectional sync */
-  handleFileChange(
-    changedFile: TAbstractFile,
-    onUpdate: (data: ChronoData) => void
-  ) {
-    const targetFile = this.getTargetFile();
-    if (!targetFile || changedFile.path !== targetFile.path) return;
-
-    // Ignore our own writes
-    if (this.isSaving) return;
-    if (Date.now() - this.lastWriteTime < this.writeDebounceMs) return;
-
-    void this.load().then(onUpdate).catch((error: unknown) => {
-      console.error('Chronostra: Failed to handle external file change', error);
     });
   }
 
-  private extractFutureDataBlock(content: string): string | null {
-    const regex = /```future-data\s*\n([\s\S]*?)\n```/;
-    const match = content.match(regex);
-    return match ? match[1].trim() : null;
+  handleFileChange(changedFile: TAbstractFile, onUpdate: (data: ChronoData) => boolean | void, onError: (error: unknown) => void = console.error): Promise<void> {
+    if (changedFile.path !== this.sourcePath) return Promise.resolve();
+    return this.enqueue(async () => {
+      const json = readFutureDataBlock(await this.plugin.app.vault.read(this.file()));
+      if (json === this.baseline) return;
+      if (this.failedSave) throw new Error('External changes detected. Unsaved edits are kept in this view; reopen after copying them.');
+      const data = buildTreeFromFlatItems(parseFlatItems(json));
+      if (onUpdate(data) === false) throw new Error('External changes detected. Finish or copy your draft, then reopen the plan.');
+      this.baseline = json;
+      this.revision++;
+    }).catch(onError);
   }
 }

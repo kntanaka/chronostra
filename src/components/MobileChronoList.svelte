@@ -10,6 +10,8 @@
 
   let {
     locale = 'en',
+    saveError = '',
+    onretrysave,
     rows,
     disclosureStyle = 'plain',
     allRows: suppliedAllRows,
@@ -34,6 +36,8 @@
     onunlinknote,
   }: {
     locale?: Locale;
+    saveError?: string;
+    onretrysave?: () => void;
     rows: FlatRow[];
     disclosureStyle?: 'plain' | 'circle' | 'label';
     allRows?: FlatRow[];
@@ -195,6 +199,7 @@
 </script>
 
 <div class="mobile-list">
+  {#if saveError}<div role="alert" class="save-error">{saveError}<button type="button" onclick={onretrysave}>{locale === 'ja' ? '保存を再試行' : 'Retry save'}</button></div>{/if}
   <nav class="mobile-sections" aria-label={t('sections')}>
     <button type="button" aria-pressed={section === 'must'} onclick={() => { section = 'must'; }}>{t('priorities')}</button>
     <button type="button" aria-pressed={section === 'plan'} onclick={() => { section = 'plan'; }}>{t('all')}</button>
@@ -289,6 +294,7 @@
       <span>{t('details')}</span>
     </header>
     <div class="mobile-detail-content">
+      {#if saveError}<div role="alert" class="save-error">{saveError}<button type="button" onclick={onretrysave}>{locale === 'ja' ? '保存を再試行' : 'Retry save'}</button></div>{/if}
       <div class="mobile-detail-context">{contextText(row)}</div>
       <h2>{row.label}</h2>
       <div class="mobile-detail-status">{row.status === 'done' ? t('done') : row.status === 'in-progress' ? t('inProgress') : t('todo')}{row.commitment === 'must' ? ` · ${t('priorities')}` : ''}</div>
@@ -454,6 +460,8 @@
 {/if}
 
 <style>
+  .save-error { padding: 12px; color: var(--text-error); overflow-wrap: anywhere; }
+  .save-error button { display: block; margin-top: 8px; }
   .mobile-detail-screen {
     position: fixed;
     box-sizing: border-box;

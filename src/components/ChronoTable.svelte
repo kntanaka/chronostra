@@ -150,7 +150,7 @@
     isMobileApp?: boolean;
     sourcePath?: string;
     onExpandChange?: (expandedIds: string[]) => void;
-    onDataChange?: (data: ChronoData) => void;
+    onDataChange?: (data: ChronoData) => void | Promise<void>;
     onSettingsChange?: SettingsChange;
     onEnsureNote?: (payload: {
       notePath?: string;
@@ -540,13 +540,32 @@
     queueEditTarget(flatRows[nextRowIndex].id, columns[nextColumnIndex]);
   }
 
+  let saveError = $state('');
+  let saveAttempt = 0;
   function emitChange() {
     data = { ...data };
-    onDataChange?.(data);
-    saveIndicator = true;
-    getOwnerWindow(wrapperEl).setTimeout(() => {
-      saveIndicator = false;
-    }, 800);
+    const attempt = ++saveAttempt;
+    saveIndicator = false;
+    saveError = '';
+    // Snapshot before asynchronous persistence: later edits must not change this save.
+    const snapshot = snapshotData();
+    let saving: void | Promise<void>;
+    try {
+      saving = onDataChange?.(snapshot);
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : 'Save failed.';
+      return;
+    }
+    void Promise.resolve(saving).then(() => {
+      if (attempt !== saveAttempt) return;
+      saveIndicator = true;
+      getOwnerWindow(wrapperEl).setTimeout(() => {
+        if (attempt === saveAttempt) saveIndicator = false;
+      }, 800);
+    }).catch((error: unknown) => {
+      if (attempt !== saveAttempt) return;
+      saveError = error instanceof Error ? error.message : 'Save failed.';
+    });
   }
 
   function commitMutation(mutator: () => boolean | void) {
@@ -1265,6 +1284,7 @@
 />
 
 {#if !isMobileApp}
+  {#if saveError}<div role="alert" class="chrono-save-error">{saveError} <button type="button" onclick={emitChange}>{locale === 'ja' ? '保存を再試行' : 'Retry save'}</button></div>{/if}
   <div class="preview-controls">
     {#if !mobilePreview}<button type="button" aria-pressed={planningMode} onclick={() => { planningMode = !planningMode; }}>{t(planningMode ? 'yearView' : 'planning')}</button>{/if}
     <button type="button" aria-pressed={mobilePreview} onclick={() => { mobilePreview = !mobilePreview; }}>
@@ -1568,6 +1588,8 @@
 
   {#if isMobileLayout}
     <MobileChronoList
+      {saveError}
+      onretrysave={emitChange}
       {locale}
       disclosureStyle={mobilePreview ? previewDisclosure : 'plain'}
       rows={flatRows}

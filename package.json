@@ -10,7 +10,7 @@
     "lint:obsidian": "eslint src/**/*.ts",
     "link:vault": "node scripts/link-plugin.mjs",
     "link:obsidian-vault": "node scripts/link-plugin.mjs",
-    "test": "npm run test:planning && node tests/run-storage.mjs",
+    "test": "npm run test:planning && node tests/run-storage.mjs && node tests/run-provider.mjs && node tests/install.test.mjs",
     "test:planning": "node tests/run-planning.mjs",
     "preview:planning": "node scripts/preview-planning.mjs"
   },

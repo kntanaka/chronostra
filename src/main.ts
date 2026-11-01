@@ -1,4 +1,5 @@
-import { replaceFutureDataBlock } from './markdown-data';
+import { readFutureDataBlock } from './markdown-data';
+import { DataProvider } from './data-provider';
 import type { SettingsChange } from './settings';
 import {
   Plugin,
@@ -17,8 +18,7 @@ import {
   ChronostraSettingTab,
   type TimelineDisplay,
 } from './settings';
-import { buildTreeFromFlatItems, flattenTreeToItems } from './parser';
-import type { FlatItem, ChronoData } from './types';
+import type { ChronoData } from './types';
 import { ChronostraView, VIEW_TYPE_CHRONOSTRA } from './view';
 
 /**
@@ -138,7 +138,7 @@ export default class ChronostraPlugin extends Plugin {
       this.registerMarkdownCodeBlockProcessor(
         'future-data',
         (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
-          this.renderCodeBlock(source, el, ctx);
+          return this.renderCodeBlock(source, el, ctx);
         }
       );
 
@@ -168,33 +168,23 @@ export default class ChronostraPlugin extends Plugin {
     this.svelteInstances.clear();
   }
 
-  private renderCodeBlock(
+  private async renderCodeBlock(
     source: string,
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext
   ) {
-    let parsed: unknown;
+    const provider = new DataProvider(this, ctx.sourcePath);
+    let data: ChronoData;
     try {
-      parsed = JSON.parse(source) as unknown;
-    } catch {
-      el.createDiv({
-        text: 'Chronostra: invalid JSON in future-data block',
-        cls: 'chronostra-error',
-      });
+      const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+      if (!(file instanceof TFile)) throw new Error('Plan file is missing.');
+      const json = readFutureDataBlock(await this.app.vault.read(file));
+      if (json !== source.trim()) throw new Error('Plan changed. Reopen the note.');
+      data = provider.initialize(source);
+    } catch (error) {
+      el.createDiv({ text: `Chronostra: ${error instanceof Error ? error.message : 'Cannot load plan.'}`, cls: 'chronostra-error' });
       return;
     }
-
-    if (!Array.isArray(parsed)) {
-      el.createDiv({
-        text: 'Chronostra: future-data block must contain a JSON array',
-        cls: 'chronostra-error',
-      });
-      return;
-    }
-
-    const flatItems = parsed as FlatItem[];
-
-    const data = buildTreeFromFlatItems(flatItems);
 
     // Remove readable line width constraint
     const ownerWindow = getOwnerWindow(el);
@@ -240,11 +230,7 @@ export default class ChronostraPlugin extends Plugin {
             console.error('Chronostra: Failed to save expanded state', error);
           });
         },
-        onDataChange: (updatedData: ChronoData) => {
-          void this.saveDataToFile(updatedData, ctx.sourcePath).catch((error: unknown) => {
-            console.error('Chronostra: Failed to save future-data block', error);
-          });
-        },
+        onDataChange: (updatedData: ChronoData) => provider.save(updatedData),
         onEnsureNote: async (payload: {
           notePath?: string;
           sourcePath: string;
@@ -276,19 +262,6 @@ export default class ChronostraPlugin extends Plugin {
       }
     });
     observer.observe(el.parentElement || el.ownerDocument.body, { childList: true, subtree: true });
-  }
-
-  /** Write updated data back to the markdown file's future-data code block */
-  private async saveDataToFile(data: ChronoData, sourcePath: string) {
-    const file = this.app.vault.getAbstractFileByPath(sourcePath);
-    if (!file || !(file instanceof TFile)) return;
-
-    const flatItems = flattenTreeToItems(data);
-    const newJson = JSON.stringify(flatItems, null, 2);
-
-    await this.app.vault.process(file, (content: string) => {
-      return replaceFutureDataBlock(content, newJson);
-    });
   }
 
   async loadSettings() {

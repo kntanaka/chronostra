@@ -13,7 +13,7 @@ for (const value of ['$&', '$$', '$`', "$'", '$1 $<name>', '日本語\n二行目
   assert.deepEqual(JSON.parse(block[1]), items);
   assert.equal(replaceFutureDataBlock(saved, json), saved);
 }
-assert.equal(replaceFutureDataBlock('No data block', '[]'), 'No data block');
+assert.throws(() => replaceFutureDataBlock('No data block', '[]'));
 const second = '\n```future-data\n[{"id":"untouched"}]\n```';
-assert.equal(replaceFutureDataBlock(original + second, '[]'), original + second);
+assert.throws(() => replaceFutureDataBlock(original + second, '[]'));
 console.log('Markdown storage: dollar tokens, Unicode, multiline notes, surrounding content and repeat saves passed.');
