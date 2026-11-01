@@ -109,10 +109,10 @@
           <div class="time-track" style:--column-count={columns.length}>
             {#if bar}
               <button type="button" class="plan-bar" class:dragging={drag?.step.id === step.id && drag.moved} class:done={step.status === 'done'} class:active={step.status === 'in-progress'} aria-pressed={selectedId === step.id} aria-label={`${t('selectScheduled', { title: step.title, date: step.date })} · ${t(step.status === 'done' ? 'done' : step.status === 'in-progress' ? 'inProgress' : 'todo')}`} title={`${step.title} · ${step.date}`} style:left={bar.left+'%'} style:width={`max(10px, ${bar.width}%)`} onpointerdown={(e) => startDrag(e, step)} onpointermove={moveDrag} onpointerup={() => finishDrag()} onpointercancel={() => finishDrag(true)} onlostpointercapture={() => finishDrag(true)} onkeydown={(e) => barKey(e, step)} onclick={() => { if (!suppressClick) onselect(step); suppressClick = false; }}></button>
-              <button type="button" class="resize-handle start" aria-label={t('resizeStart', { title: step.title })} style:left={bar.left+'%'} onpointerdown={(e) => startDrag(e, step, 'start')} onpointermove={moveDrag} onpointerup={() => finishDrag()} onpointercancel={() => finishDrag(true)} onlostpointercapture={() => finishDrag(true)} onkeydown={(e) => {
+              <button type="button" class="resize-handle start" aria-label={t('resizeStart', { title: step.title })} style:left={`clamp(0px, ${bar.left}%, calc(100% - 24px))`} onpointerdown={(e) => startDrag(e, step, 'start')} onpointermove={moveDrag} onpointerup={() => finishDrag()} onpointercancel={() => finishDrag(true)} onlostpointercapture={() => finishDrag(true)} onkeydown={(e) => {
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const d=parseDate(periodBounds(step)![0])!; d.setDate(d.getDate()+(e.key === 'ArrowRight' ? 1 : -1)); onselect(step); onmove(resizeScheduledStep(step,'start',localDate(d)),true); }
               }}></button>
-              <button type="button" class="resize-handle end" aria-label={t('resizeEnd', { title: step.title })} style:left={`calc(${bar.left+bar.width}% - 8px)`} onpointerdown={(e) => startDrag(e, step, 'end')} onpointermove={moveDrag} onpointerup={() => finishDrag()} onpointercancel={() => finishDrag(true)} onlostpointercapture={() => finishDrag(true)} onkeydown={(e) => {
+              <button type="button" class="resize-handle end" aria-label={t('resizeEnd', { title: step.title })} style:left={`clamp(0px, calc(${bar.left+bar.width}% - 24px), calc(100% - 24px))`} onpointerdown={(e) => startDrag(e, step, 'end')} onpointermove={moveDrag} onpointerup={() => finishDrag()} onpointercancel={() => finishDrag(true)} onlostpointercapture={() => finishDrag(true)} onkeydown={(e) => {
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const d=parseDate(periodBounds(step)![1])!; d.setDate(d.getDate()+(e.key === 'ArrowRight' ? 1 : -1)); onselect(step); onmove(resizeScheduledStep(step,'end',localDate(d)),true); }
               }}></button>
             {/if}
@@ -133,25 +133,26 @@
 .timeline-tools button { min-height:36px; padding:6px 10px; box-shadow:none; }
 .zoom button[aria-pressed="true"] { background:var(--interactive-accent); color:var(--text-on-accent,white); }
 .range-nav { margin-left:auto; }
-.range-nav button { font-size:22px; min-width:36px; }
-.range-caption { font-size:14px; font-weight:600; margin:14px 0 6px; }
-.timeline-help,.timeline-legend { font-size:12px; color:var(--text-muted); line-height:1.5; }
+.range-nav button { font-size: 1.375rem; min-width:36px; }
+.range-caption { font-size: 0.875rem; font-weight:600; margin:14px 0 6px; }
+.timeline-help,.timeline-legend { font-size: 0.75rem; color:var(--text-muted); line-height:1.5; }
 .timeline-scroll { overflow:auto; max-height:60vh; border:1px solid var(--background-modifier-border); border-radius:10px; }
 .timeline-grid { width:calc(180px + var(--track-width)); min-width:100%; }
 .timeline-row { display:grid; grid-template-columns:180px minmax(0,1fr); min-height:68px; }
 .header { position:sticky; top:0; z-index:3; min-height:56px; }
-.row-label { position:sticky; left:0; z-index:2; background:var(--background-primary); border:0; border-right:1px solid var(--background-modifier-border); border-bottom:1px solid var(--background-modifier-border); padding:10px 12px; border-radius:0; text-align:left; white-space:normal; height:auto; margin:0; box-shadow:none; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:5px; font-size:13px; overflow-wrap:anywhere; }
+.row-label { position:sticky; left:0; z-index:2; background:var(--background-primary); border:0; border-right:1px solid var(--background-modifier-border); border-bottom:1px solid var(--background-modifier-border); padding:10px 12px; border-radius:0; text-align:left; white-space:normal; height:auto; margin:0; box-shadow:none; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:5px; font-size: 0.8125rem; overflow-wrap:anywhere; }
 .header .row-label { background:var(--background-secondary); }
-.step-label small { font-size:11px; color:var(--text-muted); }
+.step-label small { font-size: 0.6875rem; color:var(--text-muted); }
 .selected .row-label { box-shadow:inset 3px 0 var(--interactive-accent); }
 .time-track { position:relative; overflow:hidden; border-bottom:1px solid var(--background-modifier-border); background:repeating-linear-gradient(to right, transparent 0,transparent calc(100% / var(--column-count) - 1px),var(--background-modifier-border) calc(100% / var(--column-count) - 1px),var(--background-modifier-border) calc(100% / var(--column-count))); }
 .column-headers { display:grid; background:var(--background-secondary); }
-.column-headers button { border:0; border-right:1px solid var(--background-modifier-border); border-radius:0; font-size:12px; min-height:56px; height:auto; padding:8px; white-space:normal; box-shadow:none; }
+.column-headers button { border:0; border-right:1px solid var(--background-modifier-border); border-radius:0; font-size: 0.75rem; min-height:56px; height:auto; padding:8px; white-space:normal; box-shadow:none; }
 .column-headers span { display:block; color:var(--text-accent); }
 .plan-bar { touch-action:none; cursor:grab; user-select:none; position:absolute; top:14px; min-height:36px; height:36px; padding:0 6px; border:1px solid var(--interactive-accent); background:var(--interactive-accent); color:var(--text-on-accent,white); border-radius:6px; box-shadow:none; overflow:hidden; text-align:left; z-index:1; }
 .plan-bar[aria-pressed="true"] { outline:2px solid var(--text-normal); outline-offset:-3px; }
-.resize-handle { position:absolute; top:14px; width:8px; min-width:0; height:36px; padding:0; border:0; border-radius:3px; background:var(--text-normal); opacity:.7; z-index:3; cursor:ew-resize; touch-action:none; box-shadow:none; }
-.resize-handle:focus-visible { outline:2px solid var(--text-accent); }
+.resize-handle { position:absolute; top:0; width:24px; min-width:24px; min-height:24px; height:24px; padding:0; border:0; border-radius:3px; background:linear-gradient(to right, transparent 8px, var(--text-normal) 8px, var(--text-normal) 16px, transparent 16px); opacity:.7; z-index:3; cursor:ew-resize; touch-action:none; box-shadow:none; }
+.resize-handle.end { top:40px; }
+.resize-handle:focus-visible { outline:2px solid var(--text-accent); outline-offset:-2px; }
 .plan-bar.dragging { cursor:grabbing; opacity:.8; }
 .plan-bar.done { opacity:.65; background: repeating-linear-gradient(135deg, var(--interactive-accent), var(--interactive-accent) 6px, var(--background-secondary) 6px, var(--background-secondary) 8px); }
 .completion-label { color: var(--text-accent); font-weight: 600; }
@@ -161,5 +162,5 @@
 .timeline-legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:10px; }
 .today-key { border-left:2px solid var(--text-accent); padding-left:6px; }
 .due-key { border-left:2px solid var(--text-error); padding-left:6px; }
-.timeline-empty { padding:24px; color:var(--text-muted); font-size:14px; }
+.timeline-empty { padding:24px; color:var(--text-muted); font-size: 0.875rem; }
 </style>

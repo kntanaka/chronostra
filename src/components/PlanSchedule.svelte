@@ -1,6 +1,6 @@
 <script lang="ts">
   import PlanTimeline from './PlanTimeline.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { ItemPlan, ScheduledStep } from '../types';
   import { translator, type Locale } from '../i18n';
   import { localDate, monday, parseDate, periodBounds, planningBucket } from '../planning';
@@ -23,7 +23,18 @@
   let endDate = $state('');
   let status = $state<ScheduledStep['status']>('todo');
   let notes = $state('');
-  let error = $state(false);
+  let error = $state<'title' | 'date' | 'startDate' | 'endDate' | null>(null);
+  const uid = $props.id();
+  let root: HTMLElement;
+  let editor = $state<HTMLFormElement>();
+  let returnTarget: HTMLElement | null = null;
+  let focusEditor = true;
+  let announcement = $state('');
+  async function closeEditor() {
+    editing = false;
+    await tick();
+    (returnTarget?.isConnected ? returnTarget : root.querySelector<HTMLButtonElement>('.new-step'))?.focus();
+  }
   let removeId = $state<string | null>(null);
   const steps = $derived([...(plan?.steps ?? [])].sort((a, b) => (periodBounds(a)?.[0] ?? a.date).localeCompare(periodBounds(b)?.[0] ?? b.date)));
   const buckets = ['overdue', 'thisWeek', 'thisMonth', 'upcoming', 'completed'] as const;
@@ -35,9 +46,13 @@
     return groups;
   });
   function revealEditor(node: HTMLElement) {
+    if (focusEditor) node.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     if (!desktop) node.scrollIntoView({ block: 'nearest' });
   }
   function edit(step?: ScheduledStep) {
+    const active = root.ownerDocument.activeElement as HTMLElement | null;
+    focusEditor = !active?.matches('.resize-handle, .plan-bar');
+    if (!editing) returnTarget = active;
     stepId = step?.id ?? null;
     title = step?.title ?? '';
     period = step?.period ?? 'date';
@@ -46,7 +61,7 @@
     endDate = step?.endDate ?? '';
     status = step?.status ?? 'todo';
     notes = step?.notes ?? '';
-    error = false;
+    error = null;
     removeId = null;
     editing = true;
   }
@@ -56,7 +71,13 @@
     startDate = ''; endDate = '';
   }
   function save() {
-    if (!title.trim() || !periodBounds({ period, date }) || ((startDate || endDate) && (!parseDate(startDate) || !parseDate(endDate) || startDate > endDate))) { error = true; return; }
+    error = !title.trim() ? 'title' : (startDate || endDate)
+      ? !parseDate(startDate) ? 'startDate' : !parseDate(endDate) || startDate > endDate ? 'endDate' : null
+      : !periodBounds({ period, date }) ? 'date' : null;
+    if (error) {
+      void tick().then(() => editor?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     const step: ScheduledStep = {
       id: stepId ?? crypto.randomUUID(), title: title.trim(), period,
       date: startDate || (period === 'week' ? monday(date) : date), status,
@@ -64,17 +85,23 @@
       ...(notes.trim() ? { notes: notes.trim() } : {}),
     };
     onchange({ ...plan, steps: stepId ? (plan?.steps ?? []).map(s => s.id === stepId ? step : s) : [...(plan?.steps ?? []), step] });
-    editing = false;
+    void closeEditor();
   }
-  function toggleDone(step: ScheduledStep) {
+  async function toggleDone(step: ScheduledStep) {
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('.complete-step')];
+    const index = buttons.indexOf(root.ownerDocument.activeElement as HTMLButtonElement);
+    const nextFocus = buttons[index + 1] ?? buttons[index - 1];
     const nextStatus = step.status === 'done' ? 'todo' : 'done';
     if (stepId === step.id) status = nextStatus;
     onchange({ ...plan, steps: (plan?.steps ?? []).map(s => s.id === step.id ? { ...s, status: nextStatus } : s) });
+    announcement = `${step.title}: ${t(nextStatus === 'done' ? 'done' : 'todo')}`;
+    await tick();
+    if (index >= 0) (nextFocus?.isConnected ? nextFocus : root.querySelector<HTMLButtonElement>('.completed-toggle, .new-step'))?.focus();
   }
   function remove(id: string) {
     if (removeId !== id) { removeId = id; return; }
     onchange({ ...plan, steps: (plan?.steps ?? []).filter(s => s.id !== id) });
-    editing = false;
+    void closeEditor();
     removeId = null;
   }
   function displayDate(value: string) {
@@ -85,7 +112,8 @@
     return step.startDate && step.endDate ? `${step.startDate} – ${step.endDate}` : step.period === 'week' ? t('weekOf', { date: monday(step.date) }) : step.date;
   }
 </script>
-<section class="plan-schedule" class:desktop>
+<section class="plan-schedule" class:desktop bind:this={root}>
+  <span class="sr-only" role="status">{announcement}</span>
   <div class="deadline">
     <label><span>{t('deadline')}</span><input aria-label={t('deadline')} type="date" value={plan?.dueDate ?? ''}
       onchange={(e) => { const value = e.currentTarget.value; if (!value || parseDate(value)) onchange({ steps: plan?.steps ?? [], ...(value ? { dueDate: value } : {}) }); }} /></label>
@@ -93,7 +121,7 @@
   </div>
   <div class="planning-columns">
     <div class="agenda">
-      <div class="schedule-heading"><h3>{t('schedule')}</h3><button type="button" onclick={() => edit()}>{t('newStep')}</button></div>
+      <div class="schedule-heading"><h3>{t('schedule')}</h3><button class="new-step" type="button" onclick={() => edit()}>{t('newStep')}</button></div>
       {#if steps.length === 0}<p class="muted">{t('emptySchedule')}</p>{/if}
       {#if desktop}
         <PlanTimeline {steps} dueDate={plan?.dueDate} {today} selectedId={editing ? stepId : null} {locale} onselect={(step) => { if (!editing || stepId !== step.id) edit(step); }} onmove={(step, commit) => {
@@ -138,25 +166,25 @@
       {/if}
     </div>
     {#if editing}
-      <form class="step-editor" use:revealEditor onsubmit={(e) => { e.preventDefault(); save(); }}>
+      <form novalidate bind:this={editor} class="step-editor" use:revealEditor onsubmit={(e) => { e.preventDefault(); save(); }}>
         <h3>{t(stepId ? 'editStep' : 'newStep')}</h3>
-        <label>{t('stepTitle')}<textarea rows="2" bind:value={title} required></textarea></label>
+        <label>{t('stepTitle')}<textarea aria-invalid={error === 'title'} aria-describedby={error === 'title' ? uid : undefined} rows="2" bind:value={title} required></textarea></label>
         <div class="field-pair">
           <label>{t('period')}<select value={period} onchange={(e) => changePeriod(e.currentTarget.value as ScheduledStep['period'])}>
             <option value="month">{t('month')}</option><option value="week">{t('week')}</option><option value="date">{t('date')}</option>
           </select></label>
-          {#if !startDate && !endDate}<label>{t('date')}{#if period === 'month'}<input type="month" bind:value={date} required />{:else}<input type="date" bind:value={date} required />{/if}</label>{/if}
+          {#if !startDate && !endDate}<label>{t('date')}{#if period === 'month'}<input aria-invalid={error === 'date'} aria-describedby={error === 'date' ? uid : undefined} type="month" bind:value={date} required />{:else}<input aria-invalid={error === 'date'} aria-describedby={error === 'date' ? uid : undefined} type="date" bind:value={date} required />{/if}</label>{/if}
         </div>
         <div class="field-pair">
-          <label>{t('startDate')}<input type="date" value={startDate} oninput={(e) => { startDate = e.currentTarget.value; }} onchange={(e) => { startDate = e.currentTarget.value; }} /></label>
-          <label>{t('endDate')}<input type="date" value={endDate} oninput={(e) => { endDate = e.currentTarget.value; }} onchange={(e) => { endDate = e.currentTarget.value; }} min={startDate || undefined} /></label>
+          <label>{t('startDate')}<input aria-invalid={error === 'startDate'} aria-describedby={error === 'startDate' ? uid : undefined} type="date" value={startDate} oninput={(e) => { startDate = e.currentTarget.value; }} onchange={(e) => { startDate = e.currentTarget.value; }} /></label>
+          <label>{t('endDate')}<input aria-invalid={error === 'endDate'} aria-describedby={error === 'endDate' ? uid : undefined} type="date" value={endDate} oninput={(e) => { endDate = e.currentTarget.value; }} onchange={(e) => { endDate = e.currentTarget.value; }} min={startDate || undefined} /></label>
         </div>
         <small>{t('rangeHint')}</small>
         {#if period === 'week'}<small>{t('weekHint')}</small>{/if}
         <label>{t('status')}<select bind:value={status}><option value="todo">{t('todo')}</option><option value="in-progress">{t('inProgress')}</option><option value="done">{t('done')}</option></select></label>
         <label>{t('stepNotes')}<textarea rows="4" bind:value={notes}></textarea></label>
-        {#if error}<p class="late" role="alert">{t('invalidStep')}</p>{/if}
-        <div class="editor-actions"><button type="submit" class="mod-cta">{t('saveStep')}</button><button type="button" onclick={() => { editing = false; }}>{t('cancel')}</button></div>
+        {#if error}<p id={uid} class="late" role="alert">{t(error === 'title' ? 'requiredStepTitle' : error === 'endDate' ? 'invalidEndDate' : error === 'startDate' ? 'invalidStartDate' : 'invalidPlanDate')}</p>{/if}
+        <div class="editor-actions"><button type="submit" class="mod-cta">{t('saveStep')}</button><button type="button" onclick={() => { void closeEditor(); }}>{t('cancel')}</button></div>
         {#if stepId}<button type="button" class="late" onclick={() => remove(stepId!)}>{t(removeId === stepId ? 'confirmDelete' : 'removeStep')}</button>{/if}
       </form>
     {:else if desktop}<aside class="editor-placeholder">{t('selectStep')}</aside>
@@ -164,42 +192,43 @@
   </div>
 </section>
 <style>
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .plan-schedule { margin: 24px 0; min-width: 0; }
   .deadline { padding: 16px; border: 1px solid var(--background-modifier-border); border-radius: 12px; margin-bottom: 24px; }
-  label { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 14px; }
+  label { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 0.875rem; }
   .deadline label { font-weight: 600; }
   input, select, textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font: inherit; }
-  .plan-schedule:not(.desktop) input, .plan-schedule:not(.desktop) select, .plan-schedule:not(.desktop) textarea { font-size: 16px; }
+  .plan-schedule:not(.desktop) input, .plan-schedule:not(.desktop) select, .plan-schedule:not(.desktop) textarea { font-size: 1rem; }
   input, select, button { min-height: 44px; }
   input[type="date"], input[type="month"] { appearance: none; -webkit-appearance: none; display: block; }
   input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
   textarea { resize: vertical; padding: 10px; }
   .planning-columns { display: flex; flex-direction: column; gap: 24px; }
   .desktop .planning-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); align-items: start; }
-  .editor-placeholder { padding: 20px; border: 1px dashed var(--background-modifier-border); border-radius: 12px; color: var(--text-muted); font-size: 14px; line-height: 1.6; }
+  .editor-placeholder { padding: 20px; border: 1px dashed var(--background-modifier-border); border-radius: 12px; color: var(--text-muted); font-size: 0.875rem; line-height: 1.6; }
   .agenda { min-width: 0; }
   .schedule-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-  h3 { margin: 0; font-size: 18px; }
-  h4 { display: flex; gap: 8px; margin: 20px 0 10px; font-size: 14px; }
+  h3 { margin: 0; font-size: 1.125rem; }
+  h4 { display: flex; gap: 8px; margin: 20px 0 10px; font-size: 0.875rem; }
   h4 span, .muted, small { color: var(--text-muted); }
-  .muted { font-size: 14px; line-height: 1.5; }
+  .muted { font-size: 0.875rem; line-height: 1.5; }
   .completed-group { margin-top: 24px; border-top: 1px solid var(--background-modifier-border); }
   .completed-group h4 { margin: 8px 0; }
   .completed-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 0; border: 0; background: transparent; box-shadow: none; text-align: left; font: inherit; color: var(--text-muted); }
-  .chevron { display: inline-block; font-size: 22px; line-height: 1; }
+  .chevron { display: inline-block; font-size: 1.375rem; line-height: 1; }
   .chevron.expanded { transform: rotate(90deg); }
   .planned-card { margin: 8px 0; border: 1px solid var(--background-modifier-border); border-radius: 10px; overflow: hidden; background: var(--background-secondary); }
-  .complete-step { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid var(--background-modifier-border); border-radius: 0; box-shadow: none; background: transparent; color: var(--text-accent); font-size: 14px; }
+  .complete-step { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid var(--background-modifier-border); border-radius: 0; box-shadow: none; background: transparent; color: var(--text-accent); font-size: 0.875rem; }
   .planned-step { display: flex; flex-direction: column; align-items: stretch; gap: 6px; text-align: left; width: 100%; height: auto; padding: 14px; margin: 0; white-space: normal; overflow-wrap: anywhere; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-  .planned-step .range-dates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 4px 0; padding: 10px 0; border-top: 1px solid var(--background-modifier-border); border-bottom: 1px solid var(--background-modifier-border); }
+  .planned-step .range-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 12px; margin: 4px 0; padding: 10px 0; border-top: 1px solid var(--background-modifier-border); border-bottom: 1px solid var(--background-modifier-border); }
   .range-dates > span { display: flex; flex-direction: column; gap: 4px; }
-  .range-dates small { font-size: 11px; }
-  .range-dates time { font-size: 14px; line-height: 1.5; color: var(--text-normal); font-weight: 500; }
+  .range-dates small { font-size: 0.6875rem; }
+  .range-dates time { font-size: 0.875rem; line-height: 1.5; color: var(--text-normal); font-weight: 500; }
   .period-current { color: var(--text-accent); }
   .planned-card.selected { border-color: var(--interactive-accent); }
-  .planned-step strong { font-size: 16px; font-weight: 600; }
-  .planned-step span { font-size: 12px; color: var(--text-muted); }
-  .planned-step p { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  .planned-step strong { font-size: 1rem; font-weight: 600; }
+  .planned-step span { font-size: 0.75rem; color: var(--text-muted); }
+  .planned-step p { margin: 0; font-size: 0.875rem; line-height: 1.5; white-space: pre-wrap; }
   .step-editor { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: var(--background-secondary); border-radius: 12px; min-width: 0; }
   .step-editor { order: -1; }
   .desktop .step-editor { order: 0; position: sticky; top: 0; }
@@ -207,4 +236,5 @@
   .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .late { color: var(--text-error); }
   button { white-space: normal; height: auto; }
+  @media (max-width: 700px) { .desktop .planning-columns { grid-template-columns: minmax(0, 1fr); } }
 </style>

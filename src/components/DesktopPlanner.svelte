@@ -29,10 +29,10 @@
   .desktop-planner { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr); overflow: hidden; }
   nav, main { overflow: auto; min-width: 0; padding: 20px; }
   nav { border-right: 1px solid var(--background-modifier-border); }
-  nav h3 { font-size: 14px; margin-top: 0; }
+  nav h3 { font-size: 0.875rem; margin-top: 0; }
   nav button { display: flex; flex-direction: column; align-items: stretch; width: 100%; gap: 8px; text-align: left; height: auto; min-height: 64px; padding: 14px; margin-bottom: 8px; background: var(--background-secondary); border: 1px solid transparent; border-radius: 10px; white-space: normal; overflow-wrap: anywhere; box-shadow: none; }
   nav button.selected { border-color: var(--interactive-accent); }
-  small, nav span { font-size: 12px; color: var(--text-muted); }
+  small, nav span { font-size: 0.75rem; color: var(--text-muted); }
   h2 { margin: 8px 0; }
   main header p { color: var(--text-muted); line-height: 1.6; white-space: pre-wrap; }
 </style>

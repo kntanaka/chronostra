@@ -12,11 +12,13 @@
     "link:obsidian-vault": "node scripts/link-plugin.mjs",
     "test": "npm run test:planning && node tests/run-storage.mjs && node tests/run-provider.mjs && node tests/install.test.mjs",
     "test:planning": "node tests/run-planning.mjs",
-    "preview:planning": "node scripts/preview-planning.mjs"
+    "preview:planning": "node scripts/preview-planning.mjs",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@eslint/json": "^0.14.0",
+    "@playwright/test": "^1.64.1",
     "@tsconfig/svelte": "^5.0.0",
     "esbuild": "^0.25.0",
     "esbuild-svelte": "^0.8.0",

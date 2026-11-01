@@ -442,6 +442,7 @@
   let undoStack = $state<ChronoData[]>([]);
   let redoStack = $state<ChronoData[]>([]);
   let saveIndicator = $state(false);
+  let saveAnnouncement = $state('');
   let pendingEditId = $state<string | null>(null);
   let pendingEditColumn = $state<CellColumnKey | null>(null);
 
@@ -546,6 +547,7 @@
     data = { ...data };
     const attempt = ++saveAttempt;
     saveIndicator = false;
+    saveAnnouncement = '';
     saveError = '';
     // Snapshot before asynchronous persistence: later edits must not change this save.
     const snapshot = snapshotData();
@@ -559,6 +561,7 @@
     void Promise.resolve(saving).then(() => {
       if (attempt !== saveAttempt) return;
       saveIndicator = true;
+      saveAnnouncement = t('saved');
       getOwnerWindow(wrapperEl).setTimeout(() => {
         if (attempt === saveAttempt) saveIndicator = false;
       }, 800);
@@ -1335,7 +1338,7 @@
             <span class="title">Chronostra</span>
             <span class="row-count">{flatRows.length} rows · {zenStatusText}</span>
             {#if saveIndicator}
-              <span class="save-indicator">Saved</span>
+              <span class="save-indicator" aria-hidden="true">{t('saved')}</span>
             {/if}
           </div>
           <input
@@ -1360,7 +1363,7 @@
           <div class="mobile-title-stack">
             <span class="title">Chronostra</span>
           </div>
-          {#if saveIndicator}<span class="save-indicator">{t('saved')}</span>{/if}
+          {#if saveIndicator}<span class="save-indicator" aria-hidden="true">{t('saved')}</span>{/if}
           {#if focusId || hasCategorySelection}
             <button class="tool-link" onclick={clearFocusSelection}>{t('showAll')}</button>
           {/if}
@@ -1467,7 +1470,7 @@
             <span class="title">Chronostra</span>
             <span class="row-count">{flatRows.length} rows</span>
             {#if saveIndicator}
-              <span class="save-indicator">Saved</span>
+              <span class="save-indicator" aria-hidden="true">{t('saved')}</span>
             {/if}
           </div>
           <div class="desktop-action-group">
@@ -1588,6 +1591,7 @@
 
   {#if isMobileLayout}
     <MobileChronoList
+      {saveAnnouncement}
       {saveError}
       onretrysave={emitChange}
       {locale}
@@ -1771,7 +1775,10 @@
 </div>
 </div>
 
+{#if !isMobileLayout}<div role="status" class="save-announcement">{saveAnnouncement}</div>{/if}
+
 <style>
+  .save-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .preview-controls {
     display: flex;
     align-items: center;

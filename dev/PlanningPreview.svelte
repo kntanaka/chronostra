@@ -12,11 +12,18 @@
   let width = $state('320');
   let locale = $state<Locale>('en');
   let saved = $state('');
+  let textSize = $state('100');
+  $effect(() => {
+    const root = document.documentElement;
+    const previous = root.style.fontSize;
+    root.style.fontSize = `${Number(textSize) / 100 * 16}px`;
+    return () => { root.style.fontSize = previous; };
+  });
   onMount(() => { const stored=localStorage.getItem('chronostra-planning-demo'); if(stored) rows=JSON.parse(stored); });
   function update(id:string, plan:ItemPlan) { rows=rows.map(row=>row.id===id?{...row,plan}:row); localStorage.setItem('chronostra-planning-demo',JSON.stringify(rows)); saved='Saved locally'; }
 </script>
-<div class="demo-controls"><strong>Planning preview · sample data only</strong><button onclick={()=>mode='desktop'}>Desktop</button><button onclick={()=>mode='mobile'}>Mobile</button><select aria-label="Width" bind:value={width}><option>320</option><option>390</option></select><select aria-label="Language" bind:value={locale}><option value="en">English</option><option value="ja">日本語</option></select><span>{saved}</span></div>
-{#if mode === 'desktop'}<DesktopPlanner {rows} {locale} onplanchange={update} />{:else}<div class="preview-active" style:width={width+'px'}><MobileChronoList {rows} {locale} timelineStartYear={2026} timelineEndYear={2050} ontoggle={()=>{}} onplanchange={update} /></div>{/if}
+<div class="demo-controls"><strong>Planning preview · sample data only</strong><button onclick={()=>mode='desktop'}>Desktop</button><button onclick={()=>mode='mobile'}>Mobile</button><select aria-label="Width" bind:value={width}><option>320</option><option>390</option></select><select aria-label="Language" bind:value={locale}><option value="en">English</option><option value="ja">日本語</option></select><select aria-label="Text size" bind:value={textSize}><option value="100">Text 100%</option><option value="150">Text 150%</option><option value="200">Text 200%</option></select><span role="status">{saved}</span></div>
+{#if mode === 'desktop'}<DesktopPlanner {rows} {locale} onplanchange={update} />{:else}<div class="preview-active" style:width={width+'px'}><MobileChronoList saveAnnouncement={saved} onquickcapture={({label}) => { rows = [...rows, {...initial, id: crypto.randomUUID(), label, path: ['90 Inbox', label], commitment: undefined, plan: undefined}]; localStorage.setItem('chronostra-planning-demo', JSON.stringify(rows)); saved='Saved locally'; }} {rows} {locale} timelineStartYear={2026} timelineEndYear={2050} ontoggle={()=>{}} onplanchange={update} /></div>{/if}
 <style>
 :global(html),:global(body),:global(#app) { height:100%; margin:0; }
 :global(body) { font:16px -apple-system,BlinkMacSystemFont,sans-serif; background:#1e1e1e; color:#ddd; --background-primary:#1e1e1e; --background-secondary:#262626; --background-modifier-border:#3a3a3a; --text-normal:#ddd; --text-muted:#aaa; --text-error:#ff8585; --interactive-accent:#8b5cf6; --text-accent:#a78bfa; --interactive-normal:#333; --background-modifier-hover:#333; }

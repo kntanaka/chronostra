@@ -13,3 +13,7 @@ docs
 .env.*
 !.env.example
 !.env.test
+
+# Browser test artifacts
+/test-results/
+/playwright-report/

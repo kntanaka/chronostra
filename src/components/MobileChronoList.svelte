@@ -11,6 +11,7 @@
   let {
     locale = 'en',
     saveError = '',
+    saveAnnouncement = '',
     onretrysave,
     rows,
     disclosureStyle = 'plain',
@@ -37,6 +38,7 @@
   }: {
     locale?: Locale;
     saveError?: string;
+    saveAnnouncement?: string;
     onretrysave?: () => void;
     rows: FlatRow[];
     disclosureStyle?: 'plain' | 'circle' | 'label';
@@ -172,7 +174,8 @@
     captureOpen = false;
   }
 
-  function syncCaptureViewport(node: HTMLElement) {
+  function syncCaptureViewport(node: HTMLDialogElement) {
+    const returnFocus = node.ownerDocument.activeElement as HTMLElement | null;
     const viewport = window.visualViewport;
 
     const update = () => {
@@ -183,12 +186,16 @@
     };
 
     update();
+    node.showModal();
+    node.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     viewport?.addEventListener('resize', update);
     viewport?.addEventListener('scroll', update);
     window.addEventListener('resize', update);
 
     return {
       destroy() {
+        node.close();
+        queueMicrotask(() => { if (returnFocus?.isConnected) returnFocus.focus(); });
         viewport?.removeEventListener('resize', update);
         viewport?.removeEventListener('scroll', update);
         window.removeEventListener('resize', update);
@@ -199,6 +206,7 @@
 </script>
 
 <div class="mobile-list">
+  {#if !detailRow}<span role="status" class="sr-only">{saveAnnouncement}</span>{/if}
   {#if saveError}<div role="alert" class="save-error">{saveError}<button type="button" onclick={onretrysave}>{locale === 'ja' ? '保存を再試行' : 'Retry save'}</button></div>{/if}
   <nav class="mobile-sections" aria-label={t('sections')}>
     <button type="button" aria-pressed={section === 'must'} onclick={() => { section = 'must'; }}>{t('priorities')}</button>
@@ -286,6 +294,7 @@
   {@const descendants = allRows.filter((child) => child.parentIds.includes(row.id))}
   {@const timelineEntries = row.timeline.filter((entry) => entry.text.trim()).sort((a, b) => a.year - b.year)}
   <dialog class="mobile-detail-screen" aria-label={row.label} use:presentDetails onclose={() => { openRowId = null; confirmDeleteId = null; }}>
+    <span role="status" class="sr-only">{saveAnnouncement}</span>
     <header class="mobile-detail-nav">
       <button type="button" class="mobile-back" onclick={() => { openRowId = null; confirmDeleteId = null; }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
@@ -433,7 +442,7 @@
 {/if}
 
 {#if captureOpen}
-  <div class="mobile-capture-backdrop" role="presentation" use:syncCaptureViewport>
+  <dialog class="mobile-capture-backdrop" aria-label={t('captureTitle')} onclose={() => { captureOpen = false; }} use:syncCaptureViewport>
     <form
       class="mobile-capture-sheet"
       onsubmit={(e) => {
@@ -456,10 +465,11 @@
         {t('addToInbox')}
       </button>
     </form>
-  </div>
+  </dialog>
 {/if}
 
 <style>
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .save-error { padding: 12px; color: var(--text-error); overflow-wrap: anywhere; }
   .save-error button { display: block; margin-top: 8px; }
   .mobile-detail-screen {
@@ -480,6 +490,7 @@
   .mobile-detail-screen::backdrop { background: transparent; }
   :global(.preview-active) .mobile-detail-screen { border-radius: 24px; }
   .mobile-detail-nav {
+    flex-wrap: wrap;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -488,30 +499,33 @@
     flex-shrink: 0;
     border-bottom: 1px solid var(--background-modifier-border);
   }
-  .mobile-detail-nav > span { color: var(--text-muted); font-size: 13px; }
+  .mobile-detail-nav > span { color: var(--text-muted); font-size: 0.8125rem; }
   .mobile-back {
+    min-width: 0; max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; text-align: left;
     display: flex; align-items: center; gap: 4px;
     min-height: 44px; padding: 0;
     background: transparent; border: none; box-shadow: none;
-    color: var(--interactive-accent); font-size: 15px;
+    color: var(--interactive-accent); font-size: 0.9375rem;
   }
+  .mobile-back svg { flex-shrink: 0; }
   .mobile-detail-content {
     flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
     padding: 24px 20px calc(32px + env(safe-area-inset-bottom, 0px));
   }
-  .mobile-detail-content h2 { margin: 8px 0 12px; font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
-  .mobile-detail-context, .mobile-detail-status { color: var(--text-muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mobile-detail-content h2 { margin: 8px 0 12px; font-size: 1.5rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .mobile-detail-context, .mobile-detail-status { color: var(--text-muted); font-size: 0.8125rem; line-height: 1.5; overflow-wrap: anywhere; }
   .mobile-detail-status { margin-bottom: 24px; }
 
   .mobile-sections {
     display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr;
+    grid-template-columns: minmax(0, 1.7fr) repeat(2, minmax(0, 1fr));
     gap: 3px;
     padding: 3px;
     border-radius: 12px;
     background: var(--background-modifier-border);
   }
   .mobile-sections button {
+    min-width: 0; height: auto; white-space: normal; overflow-wrap: anywhere;
     min-height: 44px;
     padding: 0 8px;
     border: none;
@@ -519,8 +533,11 @@
     background: transparent;
     box-shadow: none;
     color: var(--text-muted);
-    font-size: 15px;
+    font-size: 0.9375rem;
     font-weight: 600;
+  }
+  @container (max-width: 14rem) {
+    .mobile-sections { grid-template-columns: minmax(0, 1fr); }
   }
   .mobile-sections button[aria-pressed="true"] {
     background: var(--background-primary);
@@ -528,6 +545,7 @@
     box-shadow: 0 1px 3px var(--background-modifier-box-shadow);
   }
   .mobile-list {
+    container-type: inline-size;
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
@@ -552,6 +570,7 @@
   }
 
   .mobile-section-heading {
+    flex-wrap: wrap; overflow-wrap: anywhere;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -560,7 +579,7 @@
     padding: 0 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     color: var(--text-faint);
-    font-size: 12px;
+    font-size: 0.75rem;
     letter-spacing: normal;
     text-transform: none;
   }
@@ -622,7 +641,7 @@
     gap: 6px;
     margin-bottom: 2px;
     color: var(--text-faint);
-    font-size: 11px;
+    font-size: 0.6875rem;
     letter-spacing: normal;
     text-transform: none;
   }
@@ -643,7 +662,7 @@
     background: transparent;
     color: var(--text-normal);
     font: inherit;
-    font-size: 17px;
+    font-size: 1.0625rem;
     font-weight: 400;
     line-height: 1.5;
     text-align: left;
@@ -652,12 +671,12 @@
 
   .mobile-row.kind-category .mobile-label-button,
   .mobile-row.kind-vision .mobile-label-button {
-    font-size: 17px;
+    font-size: 1.0625rem;
     font-weight: 600;
   }
 
   .mobile-row.kind-step .mobile-label-button {
-    font-size: 17px;
+    font-size: 1.0625rem;
     color: var(--text-normal);
   }
 
@@ -666,7 +685,7 @@
   .mobile-empty-line,
   .mobile-empty-state {
     color: var(--text-muted);
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 1.45;
   }
 
@@ -741,7 +760,7 @@
     border-color: transparent;
     border-radius: 10px;
     font: inherit;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 
   .mobile-disclosure:hover,
@@ -778,20 +797,20 @@
   .expand-label {
     padding-inline: 8px;
     color: var(--interactive-accent);
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
-  .mobile-reading { margin: 0; color: var(--text-normal); font-size: 16px; line-height: 1.6; }
+  .mobile-reading { margin: 0; color: var(--text-normal); font-size: 1rem; line-height: 1.6; }
   .mobile-reading div + div { margin-top: 16px; }
-  .mobile-reading dt, .mobile-reading h3 { margin: 0 0 6px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+  .mobile-reading dt, .mobile-reading h3 { margin: 0 0 6px; color: var(--text-muted); font-size: 0.8125rem; font-weight: 600; }
   .mobile-reading dd, .mobile-reading p { margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .mobile-reading ul { margin: 0; padding-left: 20px; }
   .mobile-reading li { margin-bottom: 10px; overflow-wrap: anywhere; }
-  .mobile-reading li span { color: var(--text-muted); font-size: 12px; }
+  .mobile-reading li span { color: var(--text-muted); font-size: 0.75rem; }
   .mobile-edit-fields summary { min-height: 44px; padding-block: 12px; color: var(--interactive-accent); }
   .mobile-edit-fields[open] > :global(*) { margin-bottom: 12px; }
   .mobile-note-button { min-height: 44px; white-space: normal; }
-  .mobile-capture-hint { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+  .mobile-capture-hint { margin: 0; color: var(--text-muted); font-size: 0.8125rem; line-height: 1.5; }
   .mobile-details {
     grid-column: 1 / -1;
     display: flex;
@@ -821,7 +840,7 @@
   .mobile-section-title,
   .mobile-timeline-edit span {
     color: var(--text-faint);
-    font-size: 12px;
+    font-size: 0.75rem;
     letter-spacing: 0.05em;
     text-transform: none;
   }
@@ -840,7 +859,7 @@
     background: var(--background-primary);
     color: var(--text-normal);
     font: inherit;
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.5;
     box-shadow: none;
     outline: none;
@@ -856,8 +875,7 @@
 
   .mobile-field select,
   .mobile-add-timeline input {
-    height: 44px;
-    padding: 0 8px;
+    min-height: 44px; height: auto; padding: 8px;
   }
 
   .mobile-metrics,
@@ -870,14 +888,14 @@
 
   .mobile-timeline-edit {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     align-items: start;
   }
 
   .mobile-add-timeline {
     display: grid;
-    grid-template-columns: 74px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -895,7 +913,7 @@
     color: var(--text-muted);
     box-shadow: none;
     font: inherit;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
 
   .mobile-capture-empty {
@@ -972,17 +990,18 @@
     border-radius: 10px;
     background: transparent;
     color: var(--interactive-accent);
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1;
   }
 
   .mobile-capture-button strong {
-    font-size: 16px;
+    font-size: 1rem;
     font-weight: 600;
     line-height: 1.2;
   }
 
   .mobile-capture-backdrop {
+    margin: 0; padding: 0; border: 0; width: 100%; max-width: none; max-height: none; box-sizing: border-box;
     position: fixed;
     top: var(--capture-viewport-top, 0px);
     right: 0;
@@ -1012,12 +1031,13 @@
   }
 
   .mobile-capture-heading {
+    flex-wrap: wrap; overflow-wrap: anywhere;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     color: var(--text-normal);
-    font-size: 18px;
+    font-size: 1.125rem;
     font-weight: 600;
   }
 
