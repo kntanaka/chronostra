@@ -88,6 +88,8 @@ code.chronostra-sticky-overflow-reset,
 }
 
 .workspace-leaf-content[data-type="chronostra-view"] .chronostra-view-content {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;

@@ -1,12 +1,19 @@
 <script lang="ts">
+  import { presentDetails } from '../actions/present-details';
+  import { translator, type Locale } from '../i18n';
+  import PlanSchedule from './PlanSchedule.svelte';
+  import type { ItemPlan } from '../types';
   import type { Commitment, FlatRow, ItemStatus } from '../types';
   import { MAX_DEPTH, effectiveScope } from '../types';
 
   type QuickCaptureType = 'task' | 'idea' | 'project' | 'goal';
 
   let {
+    locale = 'en',
     rows,
-    allRows = rows,
+    disclosureStyle = 'plain',
+    allRows: suppliedAllRows,
+    matchingRows: suppliedMatchingRows,
     showSummaryMeta = false,
     timelineStartYear,
     timelineEndYear,
@@ -16,6 +23,7 @@
     onstatuschange,
     oncommitmentchange,
     ontimelinechange,
+    onplanchange,
     onaddchild,
     onaddsibling,
     onduplicate,
@@ -25,8 +33,11 @@
     onnoteclick,
     onunlinknote,
   }: {
+    locale?: Locale;
     rows: FlatRow[];
+    disclosureStyle?: 'plain' | 'circle' | 'label';
     allRows?: FlatRow[];
+    matchingRows?: FlatRow[];
     showSummaryMeta?: boolean;
     timelineStartYear: number;
     timelineEndYear: number;
@@ -35,6 +46,7 @@
     onmetricchange?: (id: string, type: 'future' | 'now' | 'gap', value: string) => void;
     onstatuschange?: (id: string, value: ItemStatus) => void;
     oncommitmentchange?: (id: string, next: Commitment | undefined) => void;
+    onplanchange?: (id: string, plan: ItemPlan) => void;
     ontimelinechange?: (id: string, year: number, text: string) => void;
     onaddchild?: (id: string) => void;
     onaddsibling?: (id: string) => void;
@@ -46,6 +58,18 @@
     onunlinknote?: (id: string) => void;
   } = $props();
 
+  const allRows = $derived(suppliedAllRows ?? rows);
+  const matchingRows = $derived(suppliedMatchingRows ?? allRows);
+  const t = $derived(translator(locale));
+
+  let section = $state<'must' | 'plan' | 'inbox'>('must');
+
+  function focusRow(id: string) {
+    openRowId = null;
+    section = 'plan';
+    onfocus?.(id);
+  }
+
   let openRowId = $state<string | null>(null);
   let confirmDeleteId = $state<string | null>(null);
   let timelineDraftYears = $state<Record<string, number>>({});
@@ -56,12 +80,15 @@
 
   const startYear = $derived(Math.min(timelineStartYear, timelineEndYear));
   const endYear = $derived(Math.max(timelineStartYear, timelineEndYear));
-  const todayRows = $derived(allRows.filter(isTodayCandidate).slice(0, 6));
-  const inboxRows = $derived(allRows.filter(isInboxRow));
-  const planRows = $derived(rows.filter((row) => !isInboxRow(row)));
+  const inboxRows = $derived(matchingRows.filter((row) => isInboxRow(row) && row.depth > 0));
+  const mustRows = $derived(matchingRows.filter((row) => row.commitment === 'must'));
+  const displayedRows = $derived(section === 'must' ? mustRows : section === 'inbox' ? inboxRows : rows);
+  const sectionTitle = $derived(section === 'must' ? t('priorities') : section === 'inbox' ? t('inbox') : t('all'));
 
-  function toggleDetails(id: string) {
-    openRowId = openRowId === id ? null : id;
+  const detailRow = $derived(allRows.find((row) => row.id === openRowId));
+
+  function openDetails(id: string) {
+    openRowId = id;
     confirmDeleteId = null;
   }
 
@@ -93,6 +120,7 @@
   function requestDelete(id: string) {
     if (confirmDeleteId === id) {
       ondelete?.(id);
+      openRowId = null;
       confirmDeleteId = null;
       return;
     }
@@ -100,11 +128,11 @@
   }
 
   function scopeLabel(row: FlatRow): string {
-    if (row.depth === 0) return 'Category';
+    if (row.depth === 0) return t('category');
     const scope = effectiveScope(row.depth, row.scope) ?? 'goal';
-    if (scope === 'vision') return 'Goal';
-    if (scope === 'goal') return 'Project';
-    return 'Task';
+    if (scope === 'vision') return t('goal');
+    if (scope === 'goal') return t('project');
+    return t('task');
   }
 
   function rowKind(row: FlatRow): 'category' | 'vision' | 'goal' | 'step' {
@@ -114,42 +142,17 @@
   function summaryText(row: FlatRow): string {
     if (!row.summary) return '';
     const descendants = Math.max(row.summary.subtreeCount - 1, 0);
-    return `${descendants} items / ${row.summary.statusCounts['in-progress']} wip / ${row.summary.statusCounts.done} done / ${row.summary.linkedNotes} notes`;
+    return t('summary', { count: descendants, progress: row.summary.statusCounts['in-progress'], done: row.summary.statusCounts.done, notes: row.summary.linkedNotes });
   }
 
   function isInboxRow(row: FlatRow): boolean {
     return /^90(\b|[\s_-])/i.test(row.path[0]?.trim() ?? '');
   }
 
-  function isTodayCandidate(row: FlatRow): boolean {
-    if (row.depth === 0 || isInboxRow(row)) return false;
-    if ((row.status ?? 'todo') === 'done') return false;
-    return !row.hasChildren || row.status === 'in-progress' || row.depth >= 2;
-  }
-
   function contextText(row: FlatRow): string {
     const context = row.path.slice(0, -1);
     if (context.length === 0) return scopeLabel(row);
     return context.slice(-3).join(' / ');
-  }
-
-  function timelineText(row: FlatRow): string {
-    const entries = row.timeline
-      .filter((entry) => entry.text.trim())
-      .sort((a, b) => a.year - b.year);
-    if (entries.length === 0) return '';
-
-    const currentYear = new Date().getFullYear();
-    const next = entries.find((entry) => entry.year >= currentYear) ?? entries[entries.length - 1];
-    return `${next.year}: ${next.text}`;
-  }
-
-  function metaText(row: FlatRow): string {
-    const parts = [contextText(row)];
-    const timeline = timelineText(row);
-    if (timeline) parts.push(timeline);
-    if (row.commitment) parts.push(row.commitment);
-    return parts.filter(Boolean).join(' / ');
   }
 
   function toggleDone(row: FlatRow, checked: boolean) {
@@ -188,193 +191,159 @@
       },
     };
   }
+
 </script>
 
 <div class="mobile-list">
+  <nav class="mobile-sections" aria-label={t('sections')}>
+    <button type="button" aria-pressed={section === 'must'} onclick={() => { section = 'must'; }}>{t('priorities')}</button>
+    <button type="button" aria-pressed={section === 'plan'} onclick={() => { section = 'plan'; }}>{t('all')}</button>
+    <button type="button" aria-pressed={section === 'inbox'} onclick={() => { section = 'inbox'; }}>{t('inbox')}</button>
+  </nav>
   <section class="mobile-section-group">
     <div class="mobile-section-heading">
-      <span>Today</span>
-      <span>{todayRows.length} open</span>
+      <span>{sectionTitle}</span>
+      <span>{t('itemCount', { count: displayedRows.length })}</span>
     </div>
-    {#if todayRows.length > 0}
-      {#each todayRows as row (row.id)}
-        <article class="mobile-row mobile-row-compact kind-{rowKind(row)}" style:--depth={Math.min(row.depth, 2)}>
-          <button
-            type="button"
-            class="mobile-check"
-            class:is-done={(row.status ?? 'todo') === 'done'}
-            aria-label={(row.status ?? 'todo') === 'done' ? 'Mark as todo' : 'Mark as done'}
-            onclick={(e) => {
-              e.stopPropagation();
-              toggleDone(row, (row.status ?? 'todo') !== 'done');
-            }}
-          ></button>
-          <div class="mobile-row-body">
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
-              {row.label}
-            </button>
-            <div class="mobile-row-meta">{metaText(row)}</div>
-          </div>
-          <button type="button" class="mobile-disclosure" title="Focus row" onclick={() => onfocus?.(row.id)}>
-            &gt;
-          </button>
-        </article>
-      {/each}
-    {:else}
-      <div class="mobile-empty-line">No open next actions.</div>
-    {/if}
-  </section>
-
-  <section class="mobile-section-group mobile-inbox-group">
-    <div class="mobile-section-heading">
-      <span>90 Inbox</span>
-      <span>{Math.max(inboxRows.length - 1, 0)} captured</span>
-    </div>
-    {#if inboxRows.length > 0}
-      {#each inboxRows as row (row.id)}
-        <article
-          class="mobile-row kind-{rowKind(row)}"
-          class:kind-category={row.depth === 0}
-          style:--depth={Math.max(row.depth - 1, 0)}
-        >
-          {#if row.depth > 0}
-            <button
-              type="button"
-              class="mobile-check"
-              class:is-done={(row.status ?? 'todo') === 'done'}
-              aria-label={(row.status ?? 'todo') === 'done' ? 'Mark as todo' : 'Mark as done'}
-              onclick={(e) => {
-                e.stopPropagation();
-                toggleDone(row, (row.status ?? 'todo') !== 'done');
-              }}
-            ></button>
-          {:else}
-            <span class="mobile-folder-mark"></span>
-          {/if}
-          <div class="mobile-row-body">
-            <div class="mobile-row-kicker">
-              <span>{scopeLabel(row)}</span>
-              <span>{row.status ?? 'todo'}</span>
-            </div>
-            <button type="button" class="mobile-label-button" onclick={() => onfocus?.(row.id)}>
-              {row.label}
-            </button>
-            {#if row.depth > 0}
-              <div class="mobile-row-meta">{metaText(row)}</div>
-            {:else if showSummaryMeta && row.summary}
-              <div class="mobile-row-meta">{summaryText(row)}</div>
-            {/if}
-          </div>
-          <div class="mobile-head-actions">
-            {#if row.hasChildren}
-              <button type="button" class="mobile-disclosure" title={row.isExpanded ? 'Collapse' : 'Expand'} onclick={() => ontoggle(row.id)}>
-                {row.isExpanded ? '-' : '+'}
-              </button>
-            {/if}
-            <button type="button" class="mobile-disclosure" title="Focus row" onclick={() => onfocus?.(row.id)}>
-              &gt;
-            </button>
-          </div>
-        </article>
-      {/each}
-    {:else}
-      <button type="button" class="mobile-capture-empty" onclick={() => { captureOpen = true; }}>
-        Capture a thought into 90 Inbox
-      </button>
-    {/if}
-  </section>
-
-  <section class="mobile-section-group">
-    <div class="mobile-section-heading">
-      <span>Plan</span>
-      <span>{planRows.length} rows</span>
-    </div>
-    {#each planRows as row (row.id)}
-      {@const isOpen = openRowId === row.id}
-      {@const timelineEntries = row.timeline.filter((entry) => entry.text.trim()).sort((a, b) => a.year - b.year)}
+    {#each displayedRows as row (row.id)}
       <article
         class="mobile-row kind-{rowKind(row)}"
-        class:is-open={isOpen}
         class:kind-category={row.depth === 0}
-        style:--depth={Math.min(row.depth, 2)}
+        style:--depth={section === 'plan' ? Math.min(row.depth, 2) : 0}
       >
         {#if row.depth > 0}
           <button
             type="button"
             class="mobile-check"
+            aria-pressed={(row.status ?? 'todo') === 'done'}
             class:is-done={(row.status ?? 'todo') === 'done'}
-            aria-label={(row.status ?? 'todo') === 'done' ? 'Mark as todo' : 'Mark as done'}
+            aria-label={(row.status ?? 'todo') === 'done' ? t('markTodo') : t('markDone')}
             onclick={(e) => {
               e.stopPropagation();
               toggleDone(row, (row.status ?? 'todo') !== 'done');
             }}
           ></button>
-        {:else}
-          <span class="mobile-folder-mark"></span>
         {/if}
 
         <div class="mobile-row-body">
-          <div class="mobile-row-kicker">
-            <span>{scopeLabel(row)}</span>
-            <span>{row.status ?? 'todo'}</span>
-            {#if row.commitment}
-              <span>{row.commitment}</span>
-            {/if}
-          </div>
-          <button type="button" class="mobile-label-button" onclick={() => toggleDetails(row.id)}>
+          {#if row.status === 'in-progress'}
+            <div class="mobile-row-kicker">{t('inProgress')}</div>
+          {/if}
+          <button type="button" class="mobile-label-button" aria-haspopup="dialog" onclick={() => openDetails(row.id)}>
             {row.label}
           </button>
-          <div class="mobile-row-meta">{metaText(row)}</div>
+          {#if section !== 'plan'}<div class="mobile-row-meta">{contextText(row)}</div>{:else if row.commitment === 'must'}<div class="mobile-row-meta">{t('priorities')}</div>{/if}
           {#if showSummaryMeta && row.summary}
             <div class="mobile-summary">{summaryText(row)}</div>
           {/if}
         </div>
 
         <div class="mobile-head-actions">
-          {#if row.hasChildren}
-            <button type="button" class="mobile-disclosure" title={row.isExpanded ? 'Collapse' : 'Expand'} onclick={() => ontoggle(row.id)}>
-              {row.isExpanded ? '-' : '+'}
+          {#if section === 'plan' && row.hasChildren}
+            <button type="button" class="mobile-disclosure mobile-expand" class:expand-circle={disclosureStyle === 'circle'} class:expand-label={disclosureStyle === 'label'} aria-label={row.isExpanded ? t('close') : t('open')} aria-expanded={row.isExpanded} onclick={() => ontoggle(row.id)}>
+              <span class="expand-surface">
+                  {#if disclosureStyle === 'label'}
+                    <span>{row.isExpanded ? t('close') : t('open')}</span>
+                  {/if}
+                  <svg class:is-expanded={row.isExpanded} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </span>
             </button>
           {/if}
-          <button type="button" class="mobile-disclosure" title={isOpen ? 'Close details' : 'Open details'} onclick={() => toggleDetails(row.id)}>
-            {isOpen ? '^' : 'v'}
-          </button>
+
+          {#if section !== 'plan'}
+            <button type="button" class="mobile-disclosure" aria-label={t('viewDetails')} aria-haspopup="dialog" onclick={() => openDetails(row.id)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            </button>
+          {/if}
         </div>
 
-        {#if timelineEntries.length > 0}
-          <div class="mobile-timeline-peek">
-            {#each timelineEntries.slice(0, 3) as entry (entry.year)}
-              <span>{entry.year}: {entry.text}</span>
-            {/each}
-          </div>
-        {/if}
+      </article>
+    {/each}
+  </section>
 
-        {#if isOpen}
+  {#if displayedRows.length === 0}
+    <div class="mobile-empty-state">
+      {section === 'must' ? t('emptyPriorities') : section === 'inbox' ? t('emptyInbox') : t('emptyResults')}
+    </div>
+  {/if}
+
+  <div class="mobile-capture-dock" class:detail-open={openRowId !== null}>
+    <button type="button" class="mobile-capture-button" onclick={() => { captureOpen = true; }}>
+      <span aria-hidden="true">+</span>
+      <strong>{t('add')}</strong>
+    </button>
+  </div>
+</div>
+
+
+{#if detailRow}
+  {@const row = detailRow}
+  {@const descendants = allRows.filter((child) => child.parentIds.includes(row.id))}
+  {@const timelineEntries = row.timeline.filter((entry) => entry.text.trim()).sort((a, b) => a.year - b.year)}
+  <dialog class="mobile-detail-screen" aria-label={row.label} use:presentDetails onclose={() => { openRowId = null; confirmDeleteId = null; }}>
+    <header class="mobile-detail-nav">
+      <button type="button" class="mobile-back" onclick={() => { openRowId = null; confirmDeleteId = null; }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+        {t('back', { section: sectionTitle })}
+      </button>
+      <span>{t('details')}</span>
+    </header>
+    <div class="mobile-detail-content">
+      <div class="mobile-detail-context">{contextText(row)}</div>
+      <h2>{row.label}</h2>
+      <div class="mobile-detail-status">{row.status === 'done' ? t('done') : row.status === 'in-progress' ? t('inProgress') : t('todo')}{row.commitment === 'must' ? ` · ${t('priorities')}` : ''}</div>
           <div class="mobile-details">
+            {#key row.id}<PlanSchedule plan={row.plan} {locale} onchange={(plan) => onplanchange?.(row.id, plan)} />{/key}
+            <dl class="mobile-reading">
+              <div><dt>{t('future')}</dt><dd>{row.metrics.future || t('notWritten')}</dd></div>
+              <div><dt>{t('now')}</dt><dd>{row.metrics.now || t('notWritten')}</dd></div>
+              <div><dt>{t('gap')}</dt><dd>{row.metrics.gap || t('notWritten')}</dd></div>
+            </dl>
+            {#if timelineEntries.length > 0}
+              <section class="mobile-reading">
+                <h3>{t('timeline')}</h3>
+                {#each timelineEntries as entry (entry.year)}
+                  <p><strong>{entry.year}</strong><br />{entry.text}</p>
+                {/each}
+              </section>
+            {/if}
+            {#if descendants.length > 0}
+              <section class="mobile-reading">
+                <h3>{t('children')}</h3>
+                <ul>{#each descendants as child (child.id)}
+                  <li><span>{child.status === 'done' ? t('done') : child.status === 'in-progress' ? t('inProgress') : t('todo')}</span> {child.label}</li>
+                {/each}</ul>
+              </section>
+            {/if}
+            {#if row.notePath && onnoteclick}
+              <button type="button" class="mobile-note-button" onclick={() => onnoteclick?.(row.id)}>{t('relatedNote')}</button>
+            {/if}
+            <details class="mobile-edit-fields">
+              <summary>{t('edit')}</summary>
             <label class="mobile-field mobile-field-full">
-              <span>Plan</span>
+              <span>{t('itemName')}</span>
               <textarea rows="2" value={row.label} onchange={(e) => commitLabel(row, (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
             </label>
 
             <div class="mobile-field-grid">
               <label class="mobile-field">
-                <span>Status</span>
+                <span>{t('status')}</span>
                 <select value={row.status ?? 'todo'} onchange={(e) => onstatuschange?.(row.id, (e.currentTarget as HTMLSelectElement).value as ItemStatus)}>
-                  <option value="todo">To do</option>
-                  <option value="in-progress">In progress</option>
-                  <option value="done">Done</option>
+                  <option value="todo">{t('todo')}</option>
+                  <option value="in-progress">{t('inProgress')}</option>
+                  <option value="done">{t('done')}</option>
                 </select>
               </label>
               {#if row.depth > 0}
                 <label class="mobile-field">
-                  <span>Focus</span>
+                  <span>{t('priority')}</span>
                   <select value={row.commitment ?? ''} onchange={(e) => {
                     const value = (e.currentTarget as HTMLSelectElement).value;
                     oncommitmentchange?.(row.id, value === '' ? undefined : value as Commitment);
                   }}>
-                    <option value="">None</option>
-                    <option value="must">Must</option>
-                    <option value="wish">Wish</option>
+                    <option value="">{t('none')}</option>
+                    <option value="must">{t('priorities')}</option>
+                    <option value="wish">{t('wish')}</option>
                   </select>
                 </label>
               {/if}
@@ -382,21 +351,21 @@
 
             <div class="mobile-metrics">
               <label class="mobile-field mobile-field-full">
-                <span>Future</span>
+                <span>{t('future')}</span>
                 <textarea rows="2" value={row.metrics.future} onchange={(e) => commitMetric(row, 'future', (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
               </label>
               <label class="mobile-field mobile-field-full">
-                <span>Now</span>
+                <span>{t('now')}</span>
                 <textarea rows="2" value={row.metrics.now} onchange={(e) => commitMetric(row, 'now', (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
               </label>
               <label class="mobile-field mobile-field-full">
-                <span>Gap</span>
+                <span>{t('gap')}</span>
                 <textarea rows="2" value={row.metrics.gap} onchange={(e) => commitMetric(row, 'gap', (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
               </label>
             </div>
 
             <section class="mobile-section">
-              <div class="mobile-section-title">Timeline</div>
+              <div class="mobile-section-title">{t('timeline')}</div>
               {#if timelineEntries.length > 0}
                 <div class="mobile-timeline-list">
                   {#each timelineEntries as entry (entry.year)}
@@ -407,11 +376,12 @@
                   {/each}
                 </div>
               {:else}
-                <div class="mobile-empty-line">No timeline entries.</div>
+                <div class="mobile-empty-line">{t('emptyTimeline')}</div>
               {/if}
               <div class="mobile-add-timeline">
                 <input
                   type="number"
+                  aria-label={t('milestoneYear')}
                   min={startYear}
                   max={endYear}
                   value={timelineDraftYears[row.id] ?? startYear}
@@ -421,50 +391,40 @@
                 />
                 <input
                   type="text"
-                  placeholder="Add milestone"
+                  aria-label={t('milestoneText')}
+                  placeholder={t('addMilestone')}
                   value={timelineDraftTexts[row.id] ?? ''}
                   oninput={(e) => {
                     timelineDraftTexts[row.id] = (e.currentTarget as HTMLInputElement).value;
                   }}
                 />
-                <button type="button" onclick={() => addTimelineEntry(row)}>Add</button>
+                <button type="button" onclick={() => addTimelineEntry(row)}>{t('add')}</button>
               </div>
             </section>
 
             <div class="mobile-actions">
-              <button type="button" onclick={() => onaddchild?.(row.id)} disabled={row.depth >= MAX_DEPTH}>Child</button>
-              <button type="button" onclick={() => onaddsibling?.(row.id)}>Sibling</button>
-              <button type="button" onclick={() => onduplicate?.(row.id)}>Duplicate</button>
-              <button type="button" onclick={() => onfocus?.(row.id)}>Focus</button>
+              <button type="button" onclick={() => onaddchild?.(row.id)} disabled={row.depth >= MAX_DEPTH}>{t('addChild')}</button>
+              <button type="button" onclick={() => onaddsibling?.(row.id)}>{t('addSibling')}</button>
+              <button type="button" onclick={() => onduplicate?.(row.id)}>{t('duplicate')}</button>
+              <button type="button" onclick={() => focusRow(row.id)}>{t('focusItem')}</button>
               {#if onnoteclick}
                 <button type="button" onclick={() => onnoteclick(row.id)}>
-                  {row.notePath ? 'Open note' : 'Create note'}
+                  {row.notePath ? t('openNote') : t('createNote')}
                 </button>
               {/if}
               {#if row.notePath && onunlinknote}
-                <button type="button" onclick={() => onunlinknote(row.id)}>Unlink note</button>
+                <button type="button" onclick={() => onunlinknote(row.id)}>{t('unlinkNote')}</button>
               {/if}
               <button type="button" class="danger" onclick={() => requestDelete(row.id)}>
-                {confirmDeleteId === row.id ? 'Tap again to delete' : 'Delete'}
+                {confirmDeleteId === row.id ? t('confirmDelete') : t('delete')}
               </button>
             </div>
+            </details>
           </div>
-        {/if}
-      </article>
-    {/each}
-  </section>
 
-  {#if rows.length === 0}
-    <div class="mobile-empty-state">No rows match the current filters.</div>
-  {/if}
-
-  <div class="mobile-capture-dock">
-    <button type="button" class="mobile-capture-button" onclick={() => { captureOpen = true; }}>
-      <span aria-hidden="true">+</span>
-      <strong>New Item</strong>
-    </button>
-  </div>
-</div>
+    </div>
+  </dialog>
+{/if}
 
 {#if captureOpen}
   <div class="mobile-capture-backdrop" role="presentation" use:syncCaptureViewport>
@@ -476,47 +436,100 @@
       }}
     >
       <div class="mobile-capture-heading">
-        <span>Quick capture</span>
-        <button type="button" onclick={() => { captureOpen = false; }}>Close</button>
+        <span>{t('captureTitle')}</span>
+        <button type="button" onclick={() => { captureOpen = false; }}>{t('close')}</button>
       </div>
       <textarea
         rows="3"
-        placeholder="Write a task, idea, project, or goal..."
+        aria-label={t('captureLabel')}
+        placeholder={t('capturePlaceholder')}
         bind:value={captureText}
       ></textarea>
-      <div class="mobile-capture-controls">
-        <label>
-          <span>Type</span>
-          <select bind:value={captureType}>
-            <option value="task">Task</option>
-            <option value="idea">Idea</option>
-            <option value="project">Project</option>
-            <option value="goal">Goal</option>
-          </select>
-        </label>
-        <label>
-          <span>Destination</span>
-          <input value="90 Inbox" readonly />
-        </label>
-      </div>
+      <p class="mobile-capture-hint">{t('captureHint')}</p>
       <button type="submit" class="mobile-capture-save" disabled={!captureText.trim()}>
-        Save to 90 Inbox
+        {t('addToInbox')}
       </button>
     </form>
   </div>
 {/if}
 
 <style>
+  .mobile-detail-screen {
+    position: fixed;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    max-width: none;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    overflow: clip;
+    font-family: var(--font-interface);
+  }
+  .mobile-detail-screen[open] { display: flex; flex-direction: column; }
+  .mobile-detail-screen::backdrop { background: transparent; }
+  :global(.preview-active) .mobile-detail-screen { border-radius: 24px; }
+  .mobile-detail-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  .mobile-detail-nav > span { color: var(--text-muted); font-size: 13px; }
+  .mobile-back {
+    display: flex; align-items: center; gap: 4px;
+    min-height: 44px; padding: 0;
+    background: transparent; border: none; box-shadow: none;
+    color: var(--interactive-accent); font-size: 15px;
+  }
+  .mobile-detail-content {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: 24px 20px calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+  .mobile-detail-content h2 { margin: 8px 0 12px; font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
+  .mobile-detail-context, .mobile-detail-status { color: var(--text-muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mobile-detail-status { margin-bottom: 24px; }
+
+  .mobile-sections {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--background-modifier-border);
+  }
+  .mobile-sections button {
+    min-height: 44px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .mobile-sections button[aria-pressed="true"] {
+    background: var(--background-primary);
+    color: var(--text-normal);
+    box-shadow: 0 1px 3px var(--background-modifier-box-shadow);
+  }
   .mobile-list {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    padding: 0 0 56px;
-    background: var(--background-primary);
+    gap: 16px;
+    padding: 16px 16px 88px;
+    background: var(--background-secondary);
   }
 
   :global(body.is-phone) .mobile-list {
-    padding-bottom: calc(56px + var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px));
+    padding-bottom: calc(88px + var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px));
   }
 
   .mobile-section-group {
@@ -524,6 +537,10 @@
     flex-direction: column;
     gap: 0;
     padding-top: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--background-primary);
   }
 
   .mobile-section-heading {
@@ -531,13 +548,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 30px;
-    padding: 0 12px;
+    min-height: 48px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     color: var(--text-faint);
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: normal;
+    text-transform: none;
   }
 
   .mobile-section-heading span:first-child {
@@ -545,21 +562,14 @@
     font-weight: 600;
   }
 
-  .mobile-inbox-group {
-    border-top: none;
-    border-bottom: none;
-    margin-top: 0;
-    padding-bottom: 0;
-  }
-
   .mobile-row {
-    --indent: calc(var(--depth) * 16px);
+    --indent: calc(var(--depth) * 8px);
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-    column-gap: 6px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    column-gap: 4px;
     align-items: start;
     border-bottom: 1px solid var(--background-modifier-border);
-    padding: 8px 8px 8px calc(12px + var(--indent));
+    padding: 8px 8px 8px calc(4px + var(--indent));
     background: var(--chronostra-bg-goal);
     transition: background 0.08s ease;
   }
@@ -589,14 +599,9 @@
     font-weight: 400;
   }
 
-  .mobile-row-compact {
-    min-height: 48px;
-  }
-
   .mobile-row.kind-category {
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px 8px 10px 16px;
   }
 
   .mobile-row-body {
@@ -609,64 +614,68 @@
     gap: 6px;
     margin-bottom: 2px;
     color: var(--text-faint);
-    font-size: 9px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: normal;
+    text-transform: none;
   }
 
   .mobile-label-button {
+    display: block;
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    min-height: 26px;
+    min-height: 44px;
     padding: 0;
     border: none;
-    border-radius: 0;
+    border-radius: 10px;
     box-shadow: none;
     background: transparent;
     color: var(--text-normal);
     font: inherit;
-    font-size: 12px;
-    font-weight: inherit;
-    line-height: 1.35;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.5;
     text-align: left;
     word-break: break-word;
   }
 
   .mobile-row.kind-category .mobile-label-button,
   .mobile-row.kind-vision .mobile-label-button {
-    font-size: 13px;
+    font-size: 17px;
+    font-weight: 600;
   }
 
   .mobile-row.kind-step .mobile-label-button {
-    font-size: 11px;
-    color: var(--text-muted);
+    font-size: 17px;
+    color: var(--text-normal);
   }
 
   .mobile-row-meta,
   .mobile-summary,
   .mobile-empty-line,
   .mobile-empty-state {
-    color: var(--text-faint);
-    font-size: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
     line-height: 1.45;
   }
 
   .mobile-row-meta {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .mobile-empty-line,
   .mobile-empty-state {
-    padding: 10px 0 12px;
+    padding: 16px;
   }
 
   .mobile-check,
-  .mobile-folder-mark,
   .mobile-disclosure {
     appearance: none;
     -webkit-appearance: none;
@@ -677,50 +686,52 @@
   }
 
   .mobile-check {
-    width: 14px;
-    height: 14px;
-    margin-top: 6px;
+    position: relative;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+  }
+
+  .mobile-check::before {
+    content: '';
+    position: absolute;
+    inset: 11px;
+    border: 1.5px solid var(--text-faint);
     border-radius: 50%;
   }
 
-  .mobile-check.is-done {
+  .mobile-check.is-done::before {
     border-color: var(--interactive-accent);
-    background: transparent;
-    position: relative;
+    background: var(--interactive-accent);
   }
 
   .mobile-check.is-done::after {
     content: '';
     position: absolute;
-    left: 4px;
-    top: 1px;
-    width: 4px;
-    height: 8px;
-    border: solid var(--interactive-accent);
-    border-width: 0 1px 1px 0;
+    left: 19px;
+    top: 15px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--text-on-accent);
+    border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
 
-  .mobile-folder-mark {
-    width: 14px;
-    height: 10px;
-    margin-top: 8px;
-    border-radius: 1px;
-    border-color: var(--text-faint);
-    opacity: 0.7;
-  }
-
   .mobile-head-actions {
+    align-self: center;
     display: flex;
-    gap: 4px;
+    flex-direction: column;
+    gap: 0;
     flex-shrink: 0;
   }
 
   .mobile-disclosure {
-    min-width: 24px;
-    height: 24px;
+    min-width: 44px;
+    height: 44px;
     border-color: transparent;
-    border-radius: 0;
+    border-radius: 10px;
     font: inherit;
     font-size: 11px;
   }
@@ -731,26 +742,48 @@
     background: var(--background-secondary);
   }
 
-  .mobile-timeline-peek {
-    grid-column: 2 / -1;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 6px 0 0;
-  }
-
-  .mobile-timeline-peek span {
-    flex: 0 0 auto;
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .mobile-expand {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
     color: var(--text-muted);
-    font-size: 11px;
-    border-left: 1px solid var(--background-modifier-border);
-    padding-left: 8px;
+  }
+  .expand-surface {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .expand-surface svg {
+    flex: 0 0 auto;
+  }
+  .expand-surface svg.is-expanded {
+    transform: rotate(90deg);
+  }
+  .expand-circle .expand-surface {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--background-modifier-hover);
+  }
+  .expand-label {
+    padding-inline: 8px;
+    color: var(--interactive-accent);
+    font-size: 13px;
   }
 
+  .mobile-reading { margin: 0; color: var(--text-normal); font-size: 16px; line-height: 1.6; }
+  .mobile-reading div + div { margin-top: 16px; }
+  .mobile-reading dt, .mobile-reading h3 { margin: 0 0 6px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+  .mobile-reading dd, .mobile-reading p { margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .mobile-reading ul { margin: 0; padding-left: 20px; }
+  .mobile-reading li { margin-bottom: 10px; overflow-wrap: anywhere; }
+  .mobile-reading li span { color: var(--text-muted); font-size: 12px; }
+  .mobile-edit-fields summary { min-height: 44px; padding-block: 12px; color: var(--interactive-accent); }
+  .mobile-edit-fields[open] > :global(*) { margin-bottom: 12px; }
+  .mobile-note-button { min-height: 44px; white-space: normal; }
+  .mobile-capture-hint { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
   .mobile-details {
     grid-column: 1 / -1;
     display: flex;
@@ -778,32 +811,29 @@
 
   .mobile-field span,
   .mobile-section-title,
-  .mobile-timeline-edit span,
-  .mobile-capture-controls span {
+  .mobile-timeline-edit span {
     color: var(--text-faint);
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.05em;
-    text-transform: uppercase;
+    text-transform: none;
   }
 
   .mobile-field textarea,
   .mobile-timeline-edit textarea,
   .mobile-field select,
   .mobile-add-timeline input,
-  .mobile-capture-sheet textarea,
-  .mobile-capture-sheet select,
-  .mobile-capture-sheet input {
+  .mobile-capture-sheet textarea {
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
+    border-radius: 10px;
     background: var(--background-primary);
     color: var(--text-normal);
     font: inherit;
-    font-size: 13px;
-    line-height: 1.35;
+    font-size: 16px;
+    line-height: 1.5;
     box-shadow: none;
     outline: none;
   }
@@ -817,10 +847,8 @@
   }
 
   .mobile-field select,
-  .mobile-add-timeline input,
-  .mobile-capture-sheet select,
-  .mobile-capture-sheet input {
-    height: 40px;
+  .mobile-add-timeline input {
+    height: 44px;
     padding: 0 8px;
   }
 
@@ -852,9 +880,9 @@
   .mobile-capture-save {
     appearance: none;
     -webkit-appearance: none;
-    min-height: 40px;
+    min-height: 44px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
+    border-radius: 10px;
     background: transparent;
     color: var(--text-muted);
     box-shadow: none;
@@ -866,7 +894,7 @@
     width: 100%;
     color: var(--text-muted);
     text-align: left;
-    padding: 0 12px;
+    padding: 0 16px;
     border-color: transparent;
   }
 
@@ -884,6 +912,8 @@
     opacity: 0.4;
   }
 
+  .mobile-capture-dock.detail-open { visibility: hidden; pointer-events: none; }
+
   .mobile-capture-dock {
     position: fixed;
     left: 0;
@@ -892,7 +922,7 @@
     z-index: 1200;
     display: flex;
     justify-content: stretch;
-    padding: 6px 8px calc(var(--safe-area-inset-bottom, 0px) + 6px);
+    padding: 10px 16px calc(var(--safe-area-inset-bottom, 0px) + 6px);
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     pointer-events: auto;
@@ -911,14 +941,14 @@
     -webkit-appearance: none;
     pointer-events: auto;
     width: 100%;
-    min-height: 34px;
+    min-height: 48px;
     display: flex;
     gap: 8px;
     align-items: center;
     justify-content: center;
     padding: 0 8px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
+    border-radius: 10px;
     background: transparent;
     color: var(--text-muted);
     box-shadow: none;
@@ -931,7 +961,7 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    border-radius: 0;
+    border-radius: 10px;
     background: transparent;
     color: var(--interactive-accent);
     font-size: 16px;
@@ -939,8 +969,8 @@
   }
 
   .mobile-capture-button strong {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
     line-height: 1.2;
   }
 
@@ -967,9 +997,9 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: 12px;
-    padding: 10px 12px calc(var(--safe-area-inset-bottom, 0px) + 12px);
+    padding: 20px 16px calc(var(--safe-area-inset-bottom, 0px) + 12px);
     border-top: 1px solid var(--background-modifier-border);
-    border-radius: 0;
+    border-radius: 24px 24px 0 0;
     background: var(--background-primary);
   }
 
@@ -979,27 +1009,14 @@
     justify-content: space-between;
     gap: 12px;
     color: var(--text-normal);
-    font-size: 12px;
+    font-size: 18px;
     font-weight: 600;
   }
 
   .mobile-capture-heading button {
-    min-height: 26px;
+    min-height: 44px;
     padding: 0 8px;
     border-color: transparent;
-  }
-
-  .mobile-capture-controls {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .mobile-capture-controls label {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
   }
 
   .mobile-capture-save {
@@ -1013,10 +1030,39 @@
     opacity: 0.45;
   }
 
-  @media (max-width: 420px) {
+  .mobile-capture-button,
+  .mobile-capture-save {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: transparent;
+  }
+
+  .mobile-capture-button span {
+    color: inherit;
+  }
+
+  .mobile-list button:focus-visible,
+  .mobile-details :is(input, textarea, select):focus-visible,
+  .mobile-capture-sheet :is(button, input, textarea, select):focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+  }
+
+  .mobile-row:last-child {
+    border-bottom: none;
+  }
+
+  @container (max-width: 360px) {
     .mobile-field-grid,
     .mobile-add-timeline,
-    .mobile-capture-controls {
+    .mobile-timeline-edit {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .mobile-field-grid,
+    .mobile-add-timeline {
       grid-template-columns: 1fr;
     }
 

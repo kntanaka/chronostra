@@ -1,4 +1,9 @@
 <script lang="ts">
+  import type { SettingsChange } from '../settings';
+  import { getLanguage } from 'obsidian';
+  import { resolveLocale, translator, type Locale } from '../i18n';
+  import DesktopPlanner from './DesktopPlanner.svelte';
+  import type { ItemPlan } from '../types';
   import { tick } from 'svelte';
   import type { CellColumnKey, CellNavigationDirection, ChronoData, TreeNode, ItemStatus, FlatRow, Scope, Commitment } from '../types';
   import { effectiveScope, MAX_DEPTH } from '../types';
@@ -30,38 +35,43 @@
     nodes: TemplateDraft[];
   }
 
+  const appLocale = resolveLocale(typeof getLanguage === 'function' ? getLanguage() : 'en');
+  let previewLocale = $state<'auto' | Locale>('auto');
+  const locale = $derived(mobilePreview && previewLocale !== 'auto' ? previewLocale : appLocale);
+  const t = $derived(translator(locale));
+
   const ROW_HEIGHT = 64;
   const HISTORY_LIMIT = 50;
   const INBOX_CATEGORY_LABEL = '90 Inbox';
   const EXPANDED_TREE_STATE = { isExpanded: () => true } as TreeState;
-  const STATUS_FILTER_OPTIONS = [
-    { value: 'all', label: 'All status' },
-    { value: 'todo', label: 'To do' },
-    { value: 'in-progress', label: 'WIP' },
-    { value: 'done', label: 'Done' },
-  ];
-  const SCOPE_FILTER_OPTIONS = [
-    { value: 'all', label: 'All scopes' },
-    { value: 'category', label: 'Category' },
-    { value: 'vision', label: 'Vision' },
-    { value: 'goal', label: 'Goal' },
-    { value: 'step', label: 'Step' },
-  ];
-  const COMMITMENT_FILTER_OPTIONS = [
-    { value: 'all', label: 'All focus' },
-    { value: 'must', label: 'Must ★' },
-    { value: 'wish', label: 'Wish ☆' },
-  ];
-  const NOTE_FILTER_OPTIONS = [
-    { value: 'all', label: 'All notes' },
-    { value: 'linked', label: 'Linked note' },
-    { value: 'unlinked', label: 'No note' },
-  ];
-  const TIMELINE_DISPLAY_OPTIONS = [
-    { value: 'year', label: 'Year' },
-    { value: 'age', label: 'Age' },
-    { value: 'both', label: 'Year + age' },
-  ];
+  const STATUS_FILTER_OPTIONS = $derived([
+    { value: 'all', label: t('allStatus') },
+    { value: 'todo', label: t('todo') },
+    { value: 'in-progress', label: t('inProgress') },
+    { value: 'done', label: t('done') },
+  ]);
+  const SCOPE_FILTER_OPTIONS = $derived([
+    { value: 'all', label: t('allScopes') },
+    { value: 'category', label: t('category') },
+    { value: 'vision', label: t('goal') },
+    { value: 'goal', label: t('project') },
+    { value: 'step', label: t('task') },
+  ]);
+  const COMMITMENT_FILTER_OPTIONS = $derived([
+    { value: 'all', label: t('allPriority') },
+    { value: 'must', label: t('priorities') },
+    { value: 'wish', label: t('wish') },
+  ]);
+  const NOTE_FILTER_OPTIONS = $derived([
+    { value: 'all', label: t('allNotes') },
+    { value: 'linked', label: t('linked') },
+    { value: 'unlinked', label: t('unlinked') },
+  ]);
+  const TIMELINE_DISPLAY_OPTIONS = $derived([
+    { value: 'year', label: t('year') },
+    { value: 'age', label: t('age') },
+    { value: 'both', label: t('yearAge') },
+  ]);
 
   const ROOT_TEMPLATES: RootTemplate[] = [
     {
@@ -141,7 +151,7 @@
     sourcePath?: string;
     onExpandChange?: (expandedIds: string[]) => void;
     onDataChange?: (data: ChronoData) => void;
-    onSettingsChange?: (key: string, value: unknown) => void;
+    onSettingsChange?: SettingsChange;
     onEnsureNote?: (payload: {
       notePath?: string;
       sourcePath: string;
@@ -216,6 +226,8 @@
 
   const visibleRows = $derived(flattenTree(focusedCategories, treeState));
   const expandedRows = $derived(flattenTree(focusedCategories, EXPANDED_TREE_STATE));
+  const mobileAllRows = $derived(flattenTree(data.categories, EXPANDED_TREE_STATE));
+  const mobileMatchingRows = $derived(mobileAllRows.filter(matchesRowFilters));
   const overviewRows = $derived(
     flattenTree(data.categories, { isExpanded: () => false } as TreeState)
   );
@@ -304,6 +316,7 @@
         row.metrics.gap,
         row.notePath ?? '',
         ...row.timeline.map((entry) => entry.text),
+        ...(row.plan?.steps ?? []).map((step) => `${step.title} ${step.notes ?? ""}`),
       ]
         .join(' ')
         .toLowerCase();
@@ -361,7 +374,12 @@
   let wrapperEl: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
   let rowListEl: HTMLDivElement | undefined = $state();
-  const isMobileLayout = $derived(isMobileApp);
+  // Preview is per-view UI state; never persisted to synced plugin settings.
+  let planningMode = $state(false);
+  let mobilePreview = $state(false);
+  let previewWidth = $state('390');
+  let previewDisclosure = $state<'plain' | 'circle' | 'label'>('plain');
+  const isMobileLayout = $derived(isMobileApp || mobilePreview);
 
   function handleToggle(id: string) {
     treeState.toggle(id);
@@ -697,6 +715,15 @@
       if (!node || node.status === value) return false;
       node.status = value;
       updateAncestors(id);
+      return true;
+    });
+  }
+
+  function handlePlanChange(id: string, plan: ItemPlan) {
+    commitMutation(() => {
+      const node = findNode(data.categories, id);
+      if (!node || JSON.stringify(node.plan) === JSON.stringify(plan)) return false;
+      node.plan = plan;
       return true;
     });
   }
@@ -1237,6 +1264,43 @@
   onkeydown={handleWindowKeydown}
 />
 
+{#if !isMobileApp}
+  <div class="preview-controls">
+    {#if !mobilePreview}<button type="button" aria-pressed={planningMode} onclick={() => { planningMode = !planningMode; }}>{t(planningMode ? 'yearView' : 'planning')}</button>{/if}
+    <button type="button" aria-pressed={mobilePreview} onclick={() => { mobilePreview = !mobilePreview; }}>
+      {mobilePreview ? t('exitPreview') : t('preview')}
+    </button>
+    {#if mobilePreview}
+      <label>
+        {t('width')}
+        <select aria-label={t('previewWidth')} bind:value={previewWidth}>
+          <option value="320">320 px</option>
+          <option value="390">390 px</option>
+          <option value="430">430 px</option>
+        </select>
+      </label>
+      <label>
+        {t('expandButton')}
+        <select aria-label={t('expandStyle')} bind:value={previewDisclosure}>
+          <option value="plain">{t('chevron')}</option>
+          <option value="circle">{t('circle')}</option>
+          <option value="label">{t('label')}</option>
+        </select>
+      </label>
+      <label>
+        {t('language')}
+        <select aria-label={t('language')} bind:value={previewLocale}>
+          <option value="auto">{t('automatic')}</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </label>
+      <span>{t('liveData')}</span>
+    {/if}
+  </div>
+{/if}
+
+<div class="preview-host" class:preview-active={mobilePreview && !isMobileApp} style:--preview-width={previewWidth + 'px'}>
 <div
   class="chrono-wrapper"
   class:is-dragging={!!dragState}
@@ -1244,8 +1308,8 @@
   bind:this={wrapperEl}
 >
   <div class="sticky-chrome">
-    <div class="toolbar" class:mobile-toolbar={isMobileLayout} class:zen-toolbar={zenMode}>
-      {#if zenMode}
+    <div class="toolbar" class:chrono-mobile-toolbar={isMobileLayout} class:zen-toolbar={zenMode && !isMobileLayout}>
+      {#if zenMode && !isMobileLayout}
         <div class="zen-toolbar-row">
           <div class="zen-title-stack">
             <span class="title">Chronostra</span>
@@ -1272,69 +1336,68 @@
           <button class="tool-link tool-active zen-toggle" onclick={toggleZenMode}>Exit Zen</button>
         </div>
       {:else if isMobileLayout}
-        <div class="mobile-toolbar-row mobile-toolbar-primary">
+        <div class="chrono-mobile-toolbar-row chrono-mobile-toolbar-primary">
           <div class="mobile-title-stack">
             <span class="title">Chronostra</span>
-            <span class="row-count">{flatRows.length} rows</span>
           </div>
-          {#if saveIndicator}
-            <span class="save-indicator">Saved</span>
-          {/if}
-          <button class="add-btn" onclick={addCategory}>+ Category</button>
-        </div>
-
-        <input
-          class="search-input"
-          type="search"
-          placeholder="Search"
-          bind:value={searchQuery}
-        />
-
-        <div class="mobile-filter-strip">
-          <DropdownSelect
-            value={statusFilter}
-            options={STATUS_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={126}
-            onchange={(next) => { statusFilter = next as StatusFilter; }}
-          />
-          <DropdownSelect
-            value={scopeFilter}
-            options={SCOPE_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={126}
-            onchange={(next) => { scopeFilter = next as ScopeFilter; }}
-          />
-          <DropdownSelect
-            value={commitmentFilter}
-            options={COMMITMENT_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={118}
-            onchange={(next) => { commitmentFilter = next as CommitmentFilter; }}
-          />
-          <DropdownSelect
-            value={noteFilter}
-            options={NOTE_FILTER_OPTIONS}
-            variant="mobile"
-            minWidth={120}
-            onchange={(next) => { noteFilter = next as NoteFilter; }}
-          />
-          {#if hasActiveFilters}
-            <button class="mobile-clear-button" onclick={resetFilters}>Clear</button>
-          {/if}
-        </div>
-
-        <div class="mobile-toolbar-row mobile-toolbar-secondary">
-          <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>Undo</button>
-          <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>Redo</button>
-          <button class="tool-link" onclick={expandAll} title="Expand all">Expand</button>
-          <button class="tool-link" onclick={collapseAll} title="Collapse all">Collapse</button>
+          {#if saveIndicator}<span class="save-indicator">{t('saved')}</span>{/if}
           {#if focusId || hasCategorySelection}
-            <button class="tool-link tool-active" onclick={clearFocusSelection}>All</button>
+            <button class="tool-link" onclick={clearFocusSelection}>{t('showAll')}</button>
+          {/if}
+        </div>
+        <input class="search-input" type="search" aria-label={t('search')} placeholder={t('search')} bind:value={searchQuery} />
+        <details class="mobile-options">
+          <summary>{t('viewOptions')}{hasActiveFilters ? t('filtered') : ''}</summary>
+        <div class="mobile-filter-strip">
+          <label class="mobile-filter-field">
+            <span>{t('status')}</span>
+            <select value={statusFilter} onchange={(e) => { statusFilter = e.currentTarget.value as StatusFilter; }}>
+              {#each STATUS_FILTER_OPTIONS as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="mobile-filter-field">
+            <span>{t('scope')}</span>
+            <select value={scopeFilter} onchange={(e) => { scopeFilter = e.currentTarget.value as ScopeFilter; }}>
+              {#each SCOPE_FILTER_OPTIONS as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="mobile-filter-field">
+            <span>{t('priority')}</span>
+            <select value={commitmentFilter} onchange={(e) => { commitmentFilter = e.currentTarget.value as CommitmentFilter; }}>
+              {#each COMMITMENT_FILTER_OPTIONS as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="mobile-filter-field">
+            <span>{t('notes')}</span>
+            <select value={noteFilter} onchange={(e) => { noteFilter = e.currentTarget.value as NoteFilter; }}>
+              {#each NOTE_FILTER_OPTIONS as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+          {#if hasActiveFilters}
+            <button class="mobile-clear-button" onclick={resetFilters}>{t('clearFilters')}</button>
+          {/if}
+        </div>
+
+          <button class="tool-link" onclick={addCategory}>{t('addCategory')}</button>
+        <div class="chrono-mobile-toolbar-row chrono-mobile-toolbar-secondary">
+          <button class="tool-link" onclick={undo} disabled={undoStack.length === 0}>{t('undo')}</button>
+          <button class="tool-link" onclick={redo} disabled={redoStack.length === 0}>{t('redo')}</button>
+          <button class="tool-link" onclick={expandAll} title={t('expandAll')}>{t('expand')}</button>
+          <button class="tool-link" onclick={collapseAll} title={t('collapseAll')}>{t('collapse')}</button>
+          {#if focusId || hasCategorySelection}
+            <button class="tool-link tool-active" onclick={clearFocusSelection}>{t('showAll')}</button>
           {/if}
           <div class="toolbar-menu-anchor" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
             <button class="tool-link" class:tool-active={showTemplateMenu} onclick={() => { showTemplateMenu = !showTemplateMenu; closeRowMenu(); }}>
-              Templates
+              {t('templates')}
             </button>
             {#if showTemplateMenu}
               <div class="chronostra-menu toolbar-menu" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
@@ -1344,7 +1407,7 @@
                     class="chronostra-menu-item"
                     onclick={() => { insertRootTemplate(template.id); showTemplateMenu = false; }}
                   >
-                    {template.label}
+                    {{ 'life-areas': t('lifeAreas'), 'goal-stack': t('goalStack'), 'annual-reset': t('annualReset') }[template.id] ?? template.label}
                   </button>
                 {/each}
               </div>
@@ -1352,7 +1415,7 @@
           </div>
         </div>
 
-        <div class="mobile-toolbar-row mobile-timeline-row">
+        <div class="chrono-mobile-toolbar-row mobile-timeline-row">
           <DropdownSelect
             value={timelineDisplay}
             options={TIMELINE_DISPLAY_OPTIONS}
@@ -1361,14 +1424,14 @@
             onchange={updateTimelineDisplay}
           />
           <div class="range-control">
-            <span>Timeline</span>
+            <span>{t('range')}</span>
             <input
               class="range-input"
               type="number"
               value={timelineStartYear}
               onchange={(e) => normalizeTimelineRange(parseInt((e.currentTarget as HTMLInputElement).value, 10) || timelineStartYear, timelineEndYear)}
             />
-            <span>to</span>
+            <span>{t('to')}</span>
             <input
               class="range-input"
               type="number"
@@ -1377,6 +1440,7 @@
             />
           </div>
         </div>
+        </details>
       {:else}
         <div class="desktop-toolbar-row desktop-toolbar-primary">
           <div class="desktop-title-stack">
@@ -1504,8 +1568,11 @@
 
   {#if isMobileLayout}
     <MobileChronoList
+      {locale}
+      disclosureStyle={mobilePreview ? previewDisclosure : 'plain'}
       rows={flatRows}
-      allRows={expandedRows}
+      allRows={mobileAllRows}
+      matchingRows={mobileMatchingRows}
       {showSummaryMeta}
       {timelineStartYear}
       {timelineEndYear}
@@ -1515,6 +1582,7 @@
       onstatuschange={handleStatusChange}
       oncommitmentchange={handleCommitmentChange}
       ontimelinechange={handleTimelineChange}
+      onplanchange={handlePlanChange}
       onaddchild={addChild}
       onaddsibling={addSibling}
       onduplicate={duplicateRow}
@@ -1524,6 +1592,8 @@
       onnoteclick={(id) => { void handleNoteClick(id); }}
       onunlinknote={unlinkNote}
     />
+  {:else if planningMode}
+    <DesktopPlanner rows={expandedRows.filter(row => row.depth > 0 && matchesRowFilters(row))} {locale} onplanchange={handlePlanChange} />
   {:else}
     <div
       class="scroll-container"
@@ -1677,8 +1747,62 @@
     <CellPopup text={popupText} x={popupX} y={popupY} />
   {/if}
 </div>
+</div>
 
 <style>
+  .preview-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .preview-controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .preview-controls button[aria-pressed="true"] {
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+  }
+  .preview-host {
+    display: contents;
+  }
+  .preview-host.preview-active {
+    display: block;
+    position: relative;
+    /* Keep fixed capture controls inside the simulated phone viewport. */
+    contain: layout paint;
+    container-type: inline-size;
+    width: min(100%, var(--preview-width));
+    height: min(844px, 75vh);
+    min-height: 0;
+    flex: 0 1 844px;
+    margin: 12px auto;
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+  }
+  .preview-active .chrono-wrapper {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+  }
+  .preview-active :global(.mobile-capture-backdrop) {
+    top: 0;
+    height: 100%;
+  }
+  .preview-active :global(.mobile-capture-sheet) {
+    max-height: 100%;
+  }
+
   .chrono-wrapper {
     display: flex;
     flex-direction: column;
@@ -1689,6 +1813,7 @@
     position: relative;
   }
   :global(.workspace-leaf-content[data-type="chronostra-view"]) .chrono-wrapper {
+    flex: 1;
     height: 100%;
     min-height: 0;
     overflow: hidden;
@@ -1726,7 +1851,7 @@
     background: var(--background-primary);
     pointer-events: auto;
   }
-  .toolbar:not(.mobile-toolbar) {
+  .toolbar:not(.chrono-mobile-toolbar) {
     align-items: stretch;
     flex-direction: column;
     gap: 8px;
@@ -1808,25 +1933,53 @@
     flex: 1 1 16px;
     min-width: 8px;
   }
-  .toolbar.mobile-toolbar {
+  .toolbar.chrono-mobile-toolbar {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    padding: 10px 12px 12px;
+    gap: 8px;
+    padding: 20px 20px 0;
   }
-  .toolbar.mobile-toolbar.zen-toolbar {
+  .toolbar.chrono-mobile-toolbar.zen-toolbar {
     gap: 0;
     padding: 4px 8px;
   }
-  .mobile-toolbar-row {
+  .chrono-mobile-toolbar-row {
     display: flex;
     align-items: center;
     gap: 10px;
     min-width: 0;
   }
-  .mobile-toolbar-primary {
+  .chrono-mobile-toolbar-primary {
     justify-content: space-between;
+  }
+  .chrono-mobile-toolbar .title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  .mobile-options {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    color: var(--text-muted);
+    font-size: 14px;
+    max-height: 45vh;
+    overflow: auto;
+  }
+  .mobile-options summary {
+    cursor: pointer;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    color: var(--interactive-accent);
+  }
+  .mobile-options[open] {
+    padding-bottom: 12px;
+  }
+  .mobile-options .chrono-mobile-toolbar-row {
+    margin-top: 12px;
   }
   .mobile-title-stack {
     display: flex;
@@ -1835,16 +1988,30 @@
     min-width: 0;
   }
   .mobile-filter-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+  .mobile-filter-field {
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    font-size: 13px;
   }
-  .mobile-filter-strip::-webkit-scrollbar {
-    display: none;
+  .mobile-filter-field select {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    font-size: 16px;
   }
-  .mobile-toolbar-secondary {
+  .mobile-options .toolbar-menu {
+    position: static;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .chrono-mobile-toolbar-secondary {
     flex-wrap: wrap;
     row-gap: 8px;
   }
@@ -1901,7 +2068,7 @@
   .tool-link:hover {
     color: var(--text-normal);
   }
-  .toolbar:not(.mobile-toolbar) .tool-link {
+  .toolbar:not(.chrono-mobile-toolbar) .tool-link {
     min-height: 26px;
     display: inline-flex;
     align-items: center;
@@ -1911,8 +2078,8 @@
     color: var(--text-muted);
     text-decoration: none;
   }
-  .toolbar:not(.mobile-toolbar) .tool-link:hover,
-  .toolbar:not(.mobile-toolbar) .tool-link.tool-active {
+  .toolbar:not(.chrono-mobile-toolbar) .tool-link:hover,
+  .toolbar:not(.chrono-mobile-toolbar) .tool-link.tool-active {
     border-color: var(--background-modifier-border-hover, var(--text-faint));
     color: var(--text-normal);
     background: var(--background-secondary);
@@ -1939,21 +2106,21 @@
   .search-input {
     min-width: 160px;
   }
-  .toolbar:not(.mobile-toolbar) .search-input {
+  .toolbar:not(.chrono-mobile-toolbar) .search-input {
     width: 220px;
     max-width: 100%;
     height: 28px;
     border-radius: 5px;
   }
-  .mobile-toolbar .search-input {
+  .chrono-mobile-toolbar .search-input {
     width: 100%;
     min-width: 0;
-    height: 40px;
-    font-size: 14px;
-    border-radius: 6px;
+    height: 44px;
+    font-size: 16px;
+    border-radius: 12px;
   }
-  .mobile-toolbar .tool-link {
-    min-height: 32px;
+  .chrono-mobile-toolbar .tool-link {
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     padding: 0 8px;
@@ -1990,19 +2157,19 @@
     text-transform: none;
     letter-spacing: normal;
   }
-  .toolbar:not(.mobile-toolbar) .range-input {
+  .toolbar:not(.chrono-mobile-toolbar) .range-input {
     height: 28px;
     border-radius: 5px;
   }
-  .mobile-toolbar .range-control {
+  .chrono-mobile-toolbar .range-control {
     flex-wrap: wrap;
     min-width: 0;
   }
-  .mobile-toolbar .range-input {
+  .chrono-mobile-toolbar .range-input {
     width: 88px;
-    height: 36px;
-    border-radius: 6px;
-    font-size: 13px;
+    height: 44px;
+    border-radius: 10px;
+    font-size: 16px;
   }
   .toolbar-menu-anchor {
     position: relative;
@@ -2024,7 +2191,7 @@
     text-decoration: underline;
     box-shadow: none;
   }
-  .toolbar:not(.mobile-toolbar) .add-btn {
+  .toolbar:not(.chrono-mobile-toolbar) .add-btn {
     flex: 0 0 auto;
     margin-left: 0;
     min-height: 28px;
@@ -2034,11 +2201,11 @@
     color: var(--text-normal);
     text-decoration: none;
   }
-  .toolbar:not(.mobile-toolbar) .add-btn:hover {
+  .toolbar:not(.chrono-mobile-toolbar) .add-btn:hover {
     border-color: var(--background-modifier-border-hover, var(--text-faint));
     background: var(--background-secondary);
   }
-  .mobile-toolbar .add-btn {
+  .chrono-mobile-toolbar .add-btn {
     flex: 0 0 auto;
     margin-left: 0;
     min-height: 36px;

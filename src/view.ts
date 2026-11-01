@@ -1,3 +1,4 @@
+import type { SettingsChange } from './settings';
 import { ItemView, Platform, WorkspaceLeaf } from 'obsidian';
 import { mount, unmount } from 'svelte';
 import ChronoTable from './components/ChronoTable.svelte';
@@ -52,9 +53,9 @@ export class ChronostraView extends ItemView {
     );
   }
 
-  onClose() {
+  async onClose(): Promise<void> {
     if (this.svelteComponent) {
-      void unmount(this.svelteComponent).catch((error: unknown) => {
+      await unmount(this.svelteComponent).catch((error: unknown) => {
         console.error('Chronostra: Failed to unmount view UI', error);
       });
       this.svelteComponent = null;
@@ -93,12 +94,12 @@ export class ChronostraView extends ItemView {
             console.error('Chronostra: Failed to save view data', error);
           });
         },
-        onSettingsChange: (key: string, value: unknown) => {
-          (this.plugin.settings as Record<string, unknown>)[key] = value;
+        onSettingsChange: ((key, value) => {
+          this.plugin.settings[key] = value;
           void this.plugin.saveSettings().catch((error: unknown) => {
             console.error('Chronostra: Failed to save settings', error);
           });
-        },
+        }) satisfies SettingsChange,
       },
     });
   }

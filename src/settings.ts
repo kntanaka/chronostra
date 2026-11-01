@@ -15,6 +15,9 @@ export interface ChronostraSettings {
   zenMode: boolean;
 }
 
+/** Preserve the relationship between each setting key and its value type. */
+export type SettingsChange = <K extends keyof ChronostraSettings>(key: K, value: ChronostraSettings[K]) => void;
+
 export const DEFAULT_SETTINGS: ChronostraSettings = {
   targetFilePath: 'Future Plan.md',
   expandedIds: [],

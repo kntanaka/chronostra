@@ -59,7 +59,12 @@ const ctx = await esbuild.context({
   plugins: [
     svelteModulePlugin,
     esbuildSvelte({
-      compilerOptions: { css: "injected" },
+      compilerOptions: {
+        css: "injected",
+        // Obsidian keeps injected styles across plugin reloads. Include CSS content
+        // in the ID so a rebuilt component never reuses an obsolete stylesheet.
+        cssHash: ({ hash, css }) => `chronostra-${hash(css)}`,
+      },
     }),
   ],
   logLevel: "info",

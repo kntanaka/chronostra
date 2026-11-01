@@ -61,6 +61,7 @@ export function flattenTree(
       status: node.status,
       notePath: node.notePath,
       timeline: node.timeline,
+        plan: node.plan,
       summary: hasChildren ? summarizeNode(node) : undefined,
       isExpanded,
       hasChildren,

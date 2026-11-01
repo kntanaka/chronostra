@@ -1,3 +1,4 @@
+import type { SettingsChange } from './settings';
 import {
   Plugin,
   MarkdownPostProcessorContext,
@@ -248,12 +249,12 @@ export default class ChronostraPlugin extends Plugin {
           sourcePath: string;
           hierarchyPath: string[];
         }) => this.ensureRowNote(payload),
-        onSettingsChange: (key: string, value: unknown) => {
-          (this.settings as Record<string, unknown>)[key] = value;
+        onSettingsChange: ((key, value) => {
+          this.settings[key] = value;
           void this.saveSettings().catch((error: unknown) => {
             console.error('Chronostra: Failed to save settings', error);
           });
-        },
+        }) satisfies SettingsChange,
       },
     });
 

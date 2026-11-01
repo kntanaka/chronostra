@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
     "dev": "node esbuild.config.mjs --watch",
     "lint:obsidian": "eslint src/**/*.ts",
     "link:vault": "node scripts/link-plugin.mjs",
-    "link:obsidian-vault": "OBSIDIAN_VAULT=/Users/kenta/ghq/github.com/kntanaka/obsidian-vault node scripts/link-plugin.mjs"
+    "link:obsidian-vault": "OBSIDIAN_VAULT=/Users/kenta/ghq/github.com/kntanaka/obsidian-vault node scripts/link-plugin.mjs",
+    "test:planning": "node tests/run-planning.mjs",
+    "preview:planning": "node scripts/preview-planning.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
