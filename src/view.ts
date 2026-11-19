@@ -1,4 +1,5 @@
-import { ItemView, Platform, WorkspaceLeaf } from 'obsidian';
+import type { SettingsChange } from './settings';
+import { ItemView, Notice, Platform, WorkspaceLeaf } from 'obsidian';
 import { mount, unmount } from 'svelte';
 import ChronoTable from './components/ChronoTable.svelte';
 import type ChronostraPlugin from './main';
@@ -37,24 +38,33 @@ export class ChronostraView extends ItemView {
     container.addClass('chronostra-view-content');
     container.addClass('chronostra-container');
 
-    this.data = await this.dataProvider.load();
+    try {
+      this.data = await this.dataProvider.load();
+    } catch (error) {
+      container.createDiv({ text: `Chronostra: ${error instanceof Error ? error.message : 'Cannot load plan.'}`, cls: 'chronostra-error' });
+      return;
+    }
 
     this.mountSvelte(container);
 
     // Watch for external file changes
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
-        this.dataProvider.handleFileChange(file, (newData) => {
+        void this.dataProvider.handleFileChange(file, (newData) => {
+          const active = container.ownerDocument.activeElement;
+          // Remounting would erase text the user has not submitted yet.
+          if (container.querySelector('.step-editor, .mobile-capture-sheet')
+            || (active && container.contains(active) && active.matches('input, textarea, [contenteditable="true"]'))) return false;
           this.data = newData;
           this.remount();
-        });
+        }, error => { new Notice(`Chronostra: ${error instanceof Error ? error.message : 'Cannot reload plan.'}`); });
       })
     );
   }
 
-  onClose() {
+  async onClose(): Promise<void> {
     if (this.svelteComponent) {
-      void unmount(this.svelteComponent).catch((error: unknown) => {
+      await unmount(this.svelteComponent).catch((error: unknown) => {
         console.error('Chronostra: Failed to unmount view UI', error);
       });
       this.svelteComponent = null;
@@ -87,18 +97,16 @@ export class ChronostraView extends ItemView {
           sourcePath: string;
           hierarchyPath: string[];
         }) => this.plugin.ensureRowNote(payload),
-        onDataChange: (updatedData: ChronoData) => {
+        onDataChange: async (updatedData: ChronoData) => {
+          await this.dataProvider.save(updatedData);
           this.data = updatedData;
-          void this.dataProvider.save(updatedData).catch((error: unknown) => {
-            console.error('Chronostra: Failed to save view data', error);
-          });
         },
-        onSettingsChange: (key: string, value: unknown) => {
-          (this.plugin.settings as Record<string, unknown>)[key] = value;
+        onSettingsChange: ((key, value) => {
+          this.plugin.settings[key] = value;
           void this.plugin.saveSettings().catch((error: unknown) => {
             console.error('Chronostra: Failed to save settings', error);
           });
-        },
+        }) satisfies SettingsChange,
       },
     });
   }

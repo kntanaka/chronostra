@@ -28,6 +28,7 @@ export function buildTreeFromFlatItems(items: FlatItem[]): ChronoData {
       status: item.status,
       notePath: item.notePath,
       timeline: item.timeline,
+      plan: item.plan,
     };
 
     // Find parent by traversing the path
@@ -62,6 +63,7 @@ export function flattenTreeToItems(data: ChronoData): FlatItem[] {
         status: node.status,
         notePath: node.notePath,
         timeline: node.timeline,
+        plan: node.plan,
       });
       if (node.children) {
         walk(node.children, path);

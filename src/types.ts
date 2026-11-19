@@ -46,6 +46,24 @@ export interface TimelineEntry {
   status?: TimelineStatus;
 }
 
+/** Calendar dates are local dates, never UTC timestamps. Week dates are Mondays. */
+export interface ScheduledStep {
+  id: string;
+  title: string;
+  period: 'month' | 'week' | 'date';
+  /** Optional explicit date range; legacy period/date remains supported. */
+  startDate?: string;
+  endDate?: string;
+  date: string;
+  status: ItemStatus;
+  notes?: string;
+}
+
+export interface ItemPlan {
+  dueDate?: string;
+  steps: ScheduledStep[];
+}
+
 export interface Metrics {
   future: string;
   now: string;
@@ -62,6 +80,7 @@ export interface TreeNode {
   status?: ItemStatus;
   notePath?: string;
   timeline: TimelineEntry[];
+  plan?: ItemPlan;
   children?: TreeNode[];
 }
 
@@ -76,6 +95,7 @@ export interface FlatRow {
   status?: ItemStatus;
   notePath?: string;
   timeline: TimelineEntry[];
+  plan?: ItemPlan;
   summary?: NodeSummary;
   isExpanded: boolean;
   hasChildren: boolean;
@@ -108,4 +128,5 @@ export interface FlatItem {
   status?: ItemStatus;
   notePath?: string;
   timeline: TimelineEntry[];
+  plan?: ItemPlan;
 }
