@@ -558,10 +558,6 @@
     padding-bottom: calc(88px + var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px));
   }
 
-  :global(body.is-phone) .mobile-list {
-    padding-bottom: calc(56px + var(--navbar-height, 0px) + var(--navbar-bottom-offset, 0px));
-  }
-
   .mobile-section-group {
     display: flex;
     flex-direction: column;
