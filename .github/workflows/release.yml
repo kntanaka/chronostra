@@ -40,6 +40,12 @@ jobs:
       - name: Regression tests
         run: npm test
 
+      - name: Install browser for UI regressions
+        run: npx playwright install --with-deps chromium
+
+      - name: UI regression tests
+        run: npm run test:ui
+
       - name: Build plugin
         run: npm run build
 
@@ -60,5 +66,5 @@ jobs:
             dist/manifest.json \
             dist/styles.css \
             --title "${GITHUB_REF_NAME}" \
-            --notes "Automated release for ${GITHUB_REF_NAME}." \
+            --notes-file RELEASE-NOTES.md \
             --verify-tag
